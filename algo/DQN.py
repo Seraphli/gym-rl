@@ -302,7 +302,6 @@ class DQN(object):
         if self.step_count % self.target_net_update_frequency == 0:
             self._sess.run(self.update_params)
 
-    # TODO: still need to speed up
     def _train(self):
         if len(self.memory) < self.replay_start_size:
             return

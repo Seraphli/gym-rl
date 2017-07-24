@@ -1,3 +1,4 @@
+from algo.WIP_DQN import agent as agent
 import argparse, gym
 from utility.env_wrapper import wrap_dqn, SimpleMonitor
 
@@ -9,11 +10,6 @@ def make_env(game_name):
     return env, monitored_env
 
 
-def parse_args():
-    parser = argparse.ArgumentParser("DQN experiments for Atari games")
-    parser.add_argument("--env", type=str, default="Pong", help="name of the game")
-
-
 if __name__ == '__main__':
-    args = parse_args()
+    args = agent.parse_args()
     env, monitored_env = make_env(args.env)

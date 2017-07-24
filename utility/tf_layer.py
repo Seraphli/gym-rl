@@ -1,26 +1,42 @@
 import tensorflow as tf
 
 
-def conv2d(x, w_shape, w_init, stride, c_names):
-    w = tf.get_variable("w", w_shape, initializer=w_init, collections=c_names)
-    return tf.nn.conv2d(x, w, strides=[1, stride, stride, 1], padding="VALID")
+def conv2d(idx, x, args):
+    with tf.variable_scope(args['layer'] + "_" + idx, reuse=args['reuse']):
+        w = tf.get_variable("w", args['kernel_size'] + [args['input'], args['output']],
+                            initializer=args['initializer'][0], trainable=args['trainable'],
+                            collections=args['collections'])
+        b = tf.get_variable("b", [args['output']], initializer=args['initializer'][1], trainable=args['trainable'],
+                            collections=args['collections'])
+        y = tf.nn.conv2d(x, w, strides=[1] + args['stride'] + [1], padding="VALID") + b
+    return [w, b], y
 
 
-def conv_layer(x, w_shape, b_shape, w_init, b_init, stride, l_name, c_names):
-    with tf.variable_scope(l_name):
-        b = tf.get_variable("b", b_shape, initializer=b_init, collections=c_names)
-        return tf.nn.relu(conv2d(x, w_shape, w_init, stride, c_names) + b)
+def relu(idx, x, args):
+    with tf.variable_scope(args['layer'] + "_" + idx, reuse=args['reuse']):
+        y = tf.nn.relu(x)
+    return [], y
 
 
-def fc_layer(x, w_shape, b_shape, w_init, b_init, l_name, c_names):
-    with tf.variable_scope(l_name):
-        w = tf.get_variable("w", w_shape, initializer=w_init, collections=c_names)
-        b = tf.get_variable("b", b_shape, initializer=b_init, collections=c_names)
-        return tf.matmul(x, w) + b
+def flatten(idx, x, args):
+    with tf.variable_scope(args['layer'] + "_" + idx, reuse=args['reuse']):
+        y = tf.contrib.layers.flatten(x)
+    return [], y
 
 
-def fc_relu_layer(x, w_shape, b_shape, w_init, b_init, l_name, c_names):
-    with tf.variable_scope(l_name):
-        w = tf.get_variable("w", w_shape, initializer=w_init, collections=c_names)
-        b = tf.get_variable("b", b_shape, initializer=b_init, collections=c_names)
-        return tf.nn.relu(tf.matmul(x, w) + b)
+def fc(idx, x, args):
+    with tf.variable_scope(args['layer'] + "_" + idx, reuse=args['reuse']):
+        w = tf.get_variable("w", [tf.shape(x)[1], args['size']], initializer=args['initializer'][0],
+                            trainable=args['trainable'], collections=args['collections'])
+        b = tf.get_variable("b", args['size'], initializer=args['initializer'][1], trainable=args['trainable'],
+                            collections=args['collections'])
+        y = tf.matmul(x, w) + b
+    return [w, b], y
+
+
+tf_layer = {
+    'conv2d': conv2d,
+    'relu': relu,
+    'flatten': flatten,
+    'fc': fc
+}

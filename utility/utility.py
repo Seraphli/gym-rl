@@ -1,6 +1,6 @@
 import logging
 
-__all__ = ['get_path', 'init_logger', 'load_config']
+__all__ = ['get_path', 'init_logger', 'main_logger', 'load_config']
 
 
 def get_path(name):
@@ -64,14 +64,14 @@ def init_logger(name):
     logger.propagate = 0
     _nf = ['[%(asctime)s]',
            '[%(name)s]',
-           '[%(filename)s:%(funcName)s:%(lineno)d]',
+           '[%(filename)20s:%(funcName)15s:%(lineno)5d]',
            '[%(levelname)s]',
-           '[%(message)s]']
+           ' %(message)s']
     _cf = ['$GREEN[%(asctime)s]$RESET',
            '[%(name)s]',
-           '$BLUE[%(filename)s:%(funcName)s:%(lineno)d]$RESET',
+           '$BLUE[%(filename)15s:%(funcName)10s:%(lineno)5d]$RESET',
            '[%(levelname)s]',
-           '$CYAN[%(message)s]$RESET']
+           ' $CYAN%(message)s$RESET']
     nformatter = logging.Formatter('-'.join(_nf))
     cformatter = ColoredFormatter('-'.join(_cf))
 
@@ -88,6 +88,9 @@ def init_logger(name):
     logger.addHandler(ch)
     logger.addHandler(rf)
     return logger
+
+
+main_logger = init_logger('main')
 
 
 def load_config(name):

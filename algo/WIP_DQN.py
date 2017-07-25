@@ -8,7 +8,11 @@ class DQN(object):
         self.algo = 'DQN'
 
     def setup(self):
-        pass
+        self._def_network()
+        with tf.variable_scope("online"):
+            self._build_network(collections="online")
+        with tf.variable_scope("target"):
+            self._build_network(trainable=False, collections="target")
 
     def parse_args(self):
         parser = argparse.ArgumentParser("DQN experiments for Atari games")
@@ -61,13 +65,21 @@ class DQN(object):
         else:
             collections = [tf.GraphKeys.GLOBAL_VARIABLES]
 
+        more_arg = {'reuse': reuse, 'initializer': initializer, 'trainable': trainable, 'collections': collections}
+
+        x = tf.placeholder(tf.float32, [None, 84, 84, 4], name='s')
+        y = x
         ws = []
         ys = []
+        ms_size = 0
         for idx, args in enumerate(self.arch):
-            args = args.copy().update(locals())
-            w, y = tf_layer[args['layer']](args)
+            args.update(more_arg)
+            y, w, m_size = tf_layer[args['layer']](idx, y, args)
             ws += w
             ys.append(y)
+            ms_size += m_size
+        return x, y, ws, ys
 
 
 agent = DQN()
+agent.setup()

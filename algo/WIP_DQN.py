@@ -1,6 +1,8 @@
 import tensorflow as tf
 import argparse
 from utility.tf_layer import tf_layer
+from utility.utility import main_logger
+from utility.tf_common import huber_loss, minimize_and_clip
 
 
 class DQN(object):
@@ -8,11 +10,10 @@ class DQN(object):
         self.algo = 'DQN'
 
     def setup(self):
+        self.action_n = 4
+        self.gamma = 0.99
         self._def_network()
-        with tf.variable_scope("online"):
-            self._build_network(collections="online")
-        with tf.variable_scope("target"):
-            self._build_network(trainable=False, collections="target")
+        self._def_model()
 
     def parse_args(self):
         parser = argparse.ArgumentParser("DQN experiments for Atari games")
@@ -53,10 +54,10 @@ class DQN(object):
             {'layer': 'flatten'},
             {'layer': 'fc', 'size': 512},
             {'layer': 'relu'},
-            {'layer': 'fc', 'size': 10}
+            {'layer': 'fc', 'size': self.action_n}
         ]
 
-    def _build_network(self, reuse=False, initializer=None, trainable=True, collections=None):
+    def _build_network(self, x, reuse=False, initializer=None, collections=None):
         if not initializer:
             initializer = [tf.contrib.layers.variance_scaling_initializer(), tf.constant_initializer()]
 
@@ -65,9 +66,8 @@ class DQN(object):
         else:
             collections = [tf.GraphKeys.GLOBAL_VARIABLES]
 
-        more_arg = {'reuse': reuse, 'initializer': initializer, 'trainable': trainable, 'collections': collections}
+        more_arg = {'reuse': reuse, 'initializer': initializer, 'collections': collections}
 
-        x = tf.placeholder(tf.float32, [None, 84, 84, 4], name='s')
         y = x
         ws = []
         ys = []
@@ -75,10 +75,34 @@ class DQN(object):
         for idx, args in enumerate(self.arch):
             args.update(more_arg)
             y, w, m_size = tf_layer[args['layer']](idx, y, args)
-            ws += w
+            ws.append(w)
             ys.append(y)
             ms_size += m_size
-        return x, y, ws, ys
+        main_logger.info("param: {}, memory size: {:.2f}MB".format(ms_size, ms_size * 4 / 1024 / 1024))
+        return y, ws, ys
+
+    def _def_model(self):
+        s = tf.placeholder(tf.float32, [None, 84, 84, 4], name='s')
+        a = tf.placeholder(tf.float32, [None, ], name='a')
+        r = tf.placeholder(tf.float32, [None, ], name='r')
+        t = tf.placeholder(tf.float32, [None, ], name='t')
+        s_ = tf.placeholder(tf.float32, [None, 84, 84, 4], name='s_')
+        with tf.variable_scope("online"):
+            q, ws, ys = self._build_network(s, collections="online")
+        with tf.variable_scope("target"):
+            q_, ws_, ys_ = self._build_network(s_, collections="target")
+        a_one_hot = tf.one_hot(a, depth=self.action_n, dtype=tf.float32)
+        q_value = tf.reduce_sum(q * a_one_hot, axis=1)
+        q_target = r + (1. - t) * self.gamma \
+                       * tf.reduce_max(q_, axis=1, name='Qmax_s_')
+        td_error = q_target - tf.stop_gradient(q_value)
+        errors = huber_loss(td_error)
+        optimizer = tf.train.AdamOptimizer(learning_rate=self.args.lr, epsilon=1e-4)
+        optimize_expr = minimize_and_clip(optimizer, errors, var_list=[w for w in ws if w])
+        with tf.variable_scope('update_params'):
+            update_params = tf.group(*[tf.assign(t, o) for t, o in zip([w for w in ws_ if w],
+                                                                       [w for w in ws if w])])
+        return {'ph': [s, a, r, t, s_], 'opt': optimize_expr, 'update': update_params}
 
 
 agent = DQN()

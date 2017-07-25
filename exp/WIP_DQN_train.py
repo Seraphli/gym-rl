@@ -1,5 +1,5 @@
 from algo.WIP_DQN import agent as agent
-import argparse, gym
+import gym
 from utility.env_wrapper import wrap_dqn, SimpleMonitor
 
 

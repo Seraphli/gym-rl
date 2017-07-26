@@ -27,7 +27,7 @@ def main():
         num_iters = 0
         while num_iters < args.num_steps:
             num_iters += 1
-            action = agent.take_action(np.array(obs)[None], eps.get(num_iters))
+            action = agent.take_action(np.array(obs)[None], eps.get(num_iters))[0]
             obs_, reward, done, info = env.step(action)
             replay_buffer.add(obs, action, reward, obs_, float(done))
             obs = obs_
@@ -61,12 +61,12 @@ def main():
                 {}\titers
                 {}\tepisodes
                 {}\treward (100 epi mean)
-                {}% exploration""".format(
+                {}\t% exploration""".format(
                     completion,
                     info["steps"],
                     num_iters,
                     len(info["rewards"]),
-                    np.mean(info["rewards"][-100:]),
+                    np.round(np.mean(info["rewards"][-100:]), 2),
                     np.round(eps.get(num_iters) * 100, 2)
                 )
                 main_logger.info(record)

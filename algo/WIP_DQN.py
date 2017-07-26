@@ -98,8 +98,7 @@ class DQN(object):
             q_, ws_, ys_ = self._build_net(s_, collections="target")
         o_vars = [_w for w in ws if w for _w in w]
         t_vars = [_w for w in ws_ if w for _w in w]
-        a_one_hot = tf.one_hot(a, depth=self.action_n, dtype=tf.float32)
-        q_value = tf.reduce_sum(q * a_one_hot, axis=1)
+        q_value = tf.reduce_sum(q * tf.one_hot(a, self.action_n), 1)
         q_target = r + (1. - t) * self.gamma * tf.reduce_max(q_, axis=1, name='Qmax_s_')
         td_error = tf.stop_gradient(q_target) - q_value
         errors = huber_loss(td_error)

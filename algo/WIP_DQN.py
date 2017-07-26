@@ -120,10 +120,20 @@ class DQN(object):
     def take_action(self, observation, epsilon):
         return tf.get_default_session().run(self.model['act'], feed_dict={
             self.model['ph'][0]: observation,
-            self.model['eps']: epsilon})
+            self.model['eps']: epsilon
+        })
 
     def update_target(self):
         tf.get_default_session().run(self.model['update'])
+
+    def train(self, s, a, r, t, s_):
+        tf.get_default_session().run(self.model['opt'], feed_dict={
+            self.model['ph'][0]: s,
+            self.model['ph'][1]: a,
+            self.model['ph'][2]: r,
+            self.model['ph'][3]: t,
+            self.model['ph'][4]: s_
+        })
 
 
 agent = DQN()

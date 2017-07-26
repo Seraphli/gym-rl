@@ -97,3 +97,75 @@ def load_config(name):
     import yaml
     with open(get_path('config') + '/' + name) as f:
         return yaml.load(f)
+
+
+def pretty_eta(seconds_left):
+    """Print the number of seconds in human readable format.
+    Examples:
+    2 days
+    2 hours and 37 minutes
+    less than a minute
+    Paramters
+    ---------
+    seconds_left: int
+        Number of seconds to be converted to the ETA
+    Returns
+    -------
+    eta: str
+        String representing the pretty ETA.
+    """
+    minutes_left = seconds_left // 60
+    seconds_left %= 60
+    hours_left = minutes_left // 60
+    minutes_left %= 60
+    days_left = hours_left // 24
+    hours_left %= 24
+
+    def helper(cnt, name):
+        return "{} {}{}".format(str(cnt), name, ('s' if cnt > 1 else ''))
+
+    if days_left > 0:
+        msg = helper(days_left, 'day')
+        if hours_left > 0:
+            msg += ' and ' + helper(hours_left, 'hour')
+        return msg
+    if hours_left > 0:
+        msg = helper(hours_left, 'hour')
+        if minutes_left > 0:
+            msg += ' and ' + helper(minutes_left, 'minute')
+        return msg
+    if minutes_left > 0:
+        return helper(minutes_left, 'minute')
+    return 'less than a minute'
+
+
+class RunningAvg(object):
+    def __init__(self, gamma, init_value=None):
+        """Keep a running estimate of a quantity. This is a bit like mean
+        but more sensitive to recent changes.
+        Parameters
+        ----------
+        gamma: float
+            Must be between 0 and 1, where 0 is the most sensitive to recent
+            changes.
+        init_value: float or None
+            Initial value of the estimate. If None, it will be set on the first update.
+        """
+        self._value = init_value
+        self._gamma = gamma
+
+    def update(self, new_val):
+        """Update the estimate.
+        Parameters
+        ----------
+        new_val: float
+            new observated value of estimated quantity.
+        """
+        if self._value is None:
+            self._value = new_val
+        else:
+            self._value = self._gamma * self._value + (1.0 - self._gamma) * new_val
+
+    def __float__(self):
+        """Get the current estimate"""
+        return self._value

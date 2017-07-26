@@ -9,11 +9,16 @@ class DQN(object):
     def __init__(self):
         self.algo = 'DQN'
 
-    def setup(self):
-        self.action_n = 4
+    def setup(self, action_n):
+        self.action_n = action_n
         self.gamma = 0.99
-        self._def_network()
-        self._def_model()
+        self._def_net()
+        self.model = self._def_model()
+        sess = tf.get_default_session()
+        init = tf.global_variables_initializer()
+        sess.run(init)
+        sess.graph.finalize()
+        sess.run(self.model['update'])
 
     def parse_args(self):
         parser = argparse.ArgumentParser("DQN experiments for Atari games")
@@ -43,7 +48,7 @@ class DQN(object):
         self.sess = tf.Session()
         return self.sess
 
-    def _def_network(self):
+    def _def_net(self):
         self.arch = [
             {'layer': 'conv2d', 'kernel_size': [8, 8], 'input': 4, 'output': 32, 'stride': [4, 4]},
             {'layer': 'relu'},
@@ -57,7 +62,7 @@ class DQN(object):
             {'layer': 'fc', 'size': self.action_n}
         ]
 
-    def _build_network(self, x, reuse=False, initializer=None, collections=None):
+    def _build_net(self, x, reuse=False, initializer=None, collections=None):
         if not initializer:
             initializer = [tf.contrib.layers.variance_scaling_initializer(), tf.constant_initializer()]
 
@@ -68,7 +73,7 @@ class DQN(object):
 
         more_arg = {'reuse': reuse, 'initializer': initializer, 'collections': collections}
 
-        y = x
+        y = tf.cast(x, tf.float32) / 255.0
         ws = []
         ys = []
         ms_size = 0
@@ -82,28 +87,43 @@ class DQN(object):
         return y, ws, ys
 
     def _def_model(self):
-        s = tf.placeholder(tf.float32, [None, 84, 84, 4], name='s')
-        a = tf.placeholder(tf.float32, [None, ], name='a')
+        s = tf.placeholder(tf.uint8, [None, 84, 84, 4], name='s')
+        a = tf.placeholder(tf.uint8, [None, ], name='a')
         r = tf.placeholder(tf.float32, [None, ], name='r')
         t = tf.placeholder(tf.float32, [None, ], name='t')
-        s_ = tf.placeholder(tf.float32, [None, 84, 84, 4], name='s_')
+        s_ = tf.placeholder(tf.uint8, [None, 84, 84, 4], name='s_')
         with tf.variable_scope("online"):
-            q, ws, ys = self._build_network(s, collections="online")
+            q, ws, ys = self._build_net(s, collections="online")
         with tf.variable_scope("target"):
-            q_, ws_, ys_ = self._build_network(s_, collections="target")
+            q_, ws_, ys_ = self._build_net(s_, collections="target")
+        o_vars = [_w for w in ws if w for _w in w]
+        t_vars = [_w for w in ws_ if w for _w in w]
         a_one_hot = tf.one_hot(a, depth=self.action_n, dtype=tf.float32)
         q_value = tf.reduce_sum(q * a_one_hot, axis=1)
-        q_target = r + (1. - t) * self.gamma \
-                       * tf.reduce_max(q_, axis=1, name='Qmax_s_')
-        td_error = q_target - tf.stop_gradient(q_value)
+        q_target = r + (1. - t) * self.gamma * tf.reduce_max(q_, axis=1, name='Qmax_s_')
+        td_error = tf.stop_gradient(q_target) - q_value
         errors = huber_loss(td_error)
         optimizer = tf.train.AdamOptimizer(learning_rate=self.args.lr, epsilon=1e-4)
-        optimize_expr = minimize_and_clip(optimizer, errors, var_list=[w for w in ws if w])
+        optimize_expr = minimize_and_clip(optimizer, errors, var_list=o_vars)
         with tf.variable_scope('update_params'):
-            update_params = tf.group(*[tf.assign(t, o) for t, o in zip([w for w in ws_ if w],
-                                                                       [w for w in ws if w])])
-        return {'ph': [s, a, r, t, s_], 'opt': optimize_expr, 'update': update_params}
+            update_expr = [tf.assign(t, o) for t, o in zip(t_vars, o_vars)]
+            update_params = tf.group(*update_expr)
+        eps = tf.placeholder(tf.float32, [], name='t')
+        with tf.variable_scope('action'):
+            batch_size = tf.shape(s)[0]
+            random_actions = tf.random_uniform(tf.stack([batch_size]), minval=0, maxval=self.action_n, dtype=tf.int64)
+            deterministic_actions = tf.argmax(q, axis=1)
+            chose_random = tf.random_uniform(tf.stack([batch_size]), minval=0, maxval=1, dtype=tf.float32) < eps
+            actions = tf.where(chose_random, random_actions, deterministic_actions)
+        return {'ph': [s, a, r, t, s_], 'eps': eps, 'act': actions, 'opt': optimize_expr, 'update': update_params}
+
+    def take_action(self, observation, epsilon):
+        return tf.get_default_session().run(self.model['act'], feed_dict={
+            self.model['ph'][0]: observation,
+            self.model['eps']: epsilon})
+
+    def update_target(self):
+        tf.get_default_session().run(self.model['update'])
 
 
 agent = DQN()
-agent.setup()

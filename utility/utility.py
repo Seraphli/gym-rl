@@ -64,12 +64,12 @@ def init_logger(name):
     logger.propagate = 0
     _nf = ['[%(asctime)s]',
            '[%(name)s]',
-           '[%(filename)15s:%(funcName)15s:%(lineno)5d]',
+           '[%(filename)20s:%(funcName)15s:%(lineno)5d]',
            '[%(levelname)s]',
            ' %(message)s']
     _cf = ['$GREEN[%(asctime)s]$RESET',
            '[%(name)s]',
-           '$BLUE[%(filename)15s:%(funcName)15s:%(lineno)5d]$RESET',
+           '$BLUE[%(filename)20s:%(funcName)15s:%(lineno)5d]$RESET',
            '[%(levelname)s]',
            ' $CYAN%(message)s$RESET']
     nformatter = logging.Formatter('-'.join(_nf))

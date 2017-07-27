@@ -1,5 +1,5 @@
 import tensorflow as tf
-from utility.utility import main_logger
+from util.util import main_logger
 
 
 def conv2d(idx, x, args):

@@ -1,9 +1,9 @@
 from algo.WIP_DQN import agent as agent
 import gym, numpy as np, time
-from utility.env_wrapper import wrap_dqn, SimpleMonitor
-from utility.replay_buffer import ReplayBuffer
-from utility.epsilon import LinearAnnealEpsilon
-from utility.utility import main_logger, pretty_eta, RunningAvg
+from util.env_wrapper import wrap_dqn, SimpleMonitor
+from util.replay_buffer import ReplayBuffer
+from util.epsilon import LinearAnnealEpsilon
+from util.util import main_logger, pretty_num, pretty_eta, RunningAvg
 
 
 def make_env(game_name):
@@ -55,21 +55,22 @@ def main():
                 steps_left = args.num_steps - info["steps"]
                 completion = np.round(info["steps"] / args.num_steps, 1)
 
-                record = """
-                {}\t% completion
-                {}\tsteps
-                {}\titers
-                {}\tepisodes
-                {}\treward (100 epi mean)
-                {}\t% exploration""".format(
+                record = "\n\t\t\t".join([
+                    "{:>15}  ||  % completion",
+                    "{:>15}  ||  steps",
+                    "{:>15}  ||  iters",
+                    "{:>15}  ||  episodes",
+                    "{:>15}  ||  reward (100 epi mean)",
+                    "{:>15}  ||  % exploration"
+                ]).format(
                     completion,
-                    info["steps"],
-                    num_iters,
-                    len(info["rewards"]),
+                    pretty_num(info["steps"]),
+                    pretty_num(num_iters),
+                    pretty_num(len(info["rewards"])),
                     np.round(np.mean(info["rewards"][-100:]), 2),
                     np.round(eps.get(num_iters) * 100, 2)
                 )
-                main_logger.info(record)
+                main_logger.info("\n\t\t\t" + record)
                 fps_estimate = (float(steps_per_iter) / (float(iteration_time_est) + 1e-6)
                                 if steps_per_iter._value is not None else "calculating...")
                 main_logger.info("ETA: " + pretty_eta(int(steps_left / fps_estimate)))

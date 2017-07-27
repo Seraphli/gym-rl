@@ -1,7 +1,5 @@
 import logging
 
-__all__ = ['get_path', 'init_logger', 'main_logger', 'load_config']
-
 
 def get_path(name):
     import os
@@ -97,6 +95,17 @@ def load_config(name):
     import yaml
     with open(get_path('config') + '/' + name) as f:
         return yaml.load(f)
+
+
+def pretty_num(num):
+    mags = [('', 0), ('k', 3), ('m', 6), ('g', 9), ('t', 12)]
+    for unit, mag in mags[::-1]:
+        if num > 10 ** mag:
+            break
+    if unit == '':
+        return "{}".format(num)
+    n = num / (10 ** mag)
+    return "{:.1f} {}".format(n, unit)
 
 
 def pretty_eta(seconds_left):

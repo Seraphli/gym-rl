@@ -1,8 +1,8 @@
 import tensorflow as tf
 import argparse
-from utility.tf_layer import tf_layer
-from utility.utility import main_logger
-from utility.tf_common import huber_loss, minimize_and_clip
+from util.tf_layer import tf_layer
+from util.util import main_logger
+from util.tf_common import huber_loss, minimize_and_clip
 
 
 class DQN(object):

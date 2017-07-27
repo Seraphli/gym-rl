@@ -1,6 +1,6 @@
 import pygame, gym, numpy as np
-from utility.utility import load_config, get_path
-from utility.exp_replay import *
+from util.util import load_config, get_path
+from util.exp_replay import *
 
 RGB_REPLAY_SHAPE = (4,
                     ((210, 160, 3), np.uint8),

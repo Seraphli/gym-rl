@@ -1,5 +1,5 @@
 import numpy as np, multiprocessing as mp
-from utility.compress import *
+from util.compress import *
 
 
 class MemoryBlock(object):

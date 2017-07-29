@@ -19,7 +19,7 @@ def main():
     with agent.make_session():
         agent.setup(env.action_space.n)
         replay_buffer = ReplayBuffer(args.replay_buffer_size)
-        eps = LinearAnnealEpsilon(1.0, 0.1, int(1e6))
+        eps = LinearAnnealEpsilon(args.eps[0], args.eps[1], int(args.eps[2]))
         obs = env.reset()
         start_time, start_steps = None, None
         fps_estimate = RecentAvg()

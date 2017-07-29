@@ -149,7 +149,7 @@ def pretty_eta(seconds_left):
 
 
 class RecentAvg(object):
-    def __init__(self, size=100):
+    def __init__(self, size=50):
         self._value = None
         self._values = []
         self._size = size

@@ -171,7 +171,10 @@ class RecentAvg(object):
 class Record(object):
     def __init__(self):
         self._info = []
-        self.format = {'kv': "|| {:>30} | {:>15} ||", 'l': "|| {:^48} ||"}
+        length = [30, 15]
+        self.length = sum(length) + 9
+        self.format = {'kv': "|| {:>" + str(length[0]) + "} | {:>" + str(length[1]) + "} ||",
+                       'l': "|| {:^" + str(sum(length) + 3) + "} ||"}
 
     def clear(self):
         self._info = []
@@ -183,13 +186,13 @@ class Record(object):
         self._info.append(('l', '', line))
 
     def dumps(self, indent=''):
-        record = ["=" * 54]
+        record = ["=" * self.length]
         for t, k, v in self._info:
             if t == 'kv':
                 record.append(self.format['kv'].format(k, v))
             if t == 'l':
                 record.append(self.format['l'].format(v))
-        record.append("=" * 54)
+        record.append("=" * self.length)
         s = indent + ('\n' + indent).join(record)
         self._info = []
         return s

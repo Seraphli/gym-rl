@@ -148,35 +148,23 @@ def pretty_eta(seconds_left):
     return 'less than a minute'
 
 
-class RunningAvg(object):
-    def __init__(self, gamma, init_value=None):
-        """Keep a running estimate of a quantity. This is a bit like mean
-        but more sensitive to recent changes.
-        Parameters
-        ----------
-        gamma: float
-            Must be between 0 and 1, where 0 is the most sensitive to recent
-            changes.
-        init_value: float or None
-            Initial value of the estimate. If None, it will be set on the first update.
-        """
-        self._value = init_value
-        self._gamma = gamma
+class RecentAvg(object):
+    def __init__(self, size=100):
+        self._value = None
+        self._values = []
+        self._size = size
+        self._current = 0
 
     def update(self, new_val):
-        """Update the estimate.
-        Parameters
-        ----------
-        new_val: float
-            new observated value of estimated quantity.
-        """
-        if self._value is None:
-            self._value = new_val
+        if len(self._values) == self._size:
+            self._values[self._current] = new_val
         else:
-            self._value = self._gamma * self._value + (1.0 - self._gamma) * new_val
+            self._values.append(new_val)
+        self._current = (self._current + 1) % self._size
+        self._value = sum(self._values) / len(self._values)
 
-    def __float__(self):
-        """Get the current estimate"""
+    @property
+    def value(self):
         return self._value
 
 

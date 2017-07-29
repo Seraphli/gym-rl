@@ -3,14 +3,18 @@ import argparse
 from util.tf_layer import tf_layer
 from util.util import main_logger
 from util.tf_common import huber_loss, minimize_and_clip
+from util.tf_input import EnqueueThread
+from functools import partial
 
 
 class DQN(object):
     def __init__(self):
         self.algo = 'DQN'
 
-    def setup(self, action_n):
+    def setup(self, action_n, replay):
         self.action_n = action_n
+        self.replay = replay
+        self._train = False
         self.gamma = 0.99
         self._def_net()
         self.model = self._def_model()
@@ -86,12 +90,23 @@ class DQN(object):
         main_logger.info("param: {}, memory size: {:.2f}MB".format(ms_size, ms_size * 4 / 1024 / 1024))
         return y, ws, ys
 
-    def _def_model(self):
+    def _def_input(self):
         s = tf.placeholder(tf.uint8, [None, 84, 84, 4], name='s')
         a = tf.placeholder(tf.uint8, [None, ], name='a')
         r = tf.placeholder(tf.float32, [None, ], name='r')
         t = tf.placeholder(tf.float32, [None, ], name='t')
         s_ = tf.placeholder(tf.uint8, [None, 84, 84, 4], name='s_')
+        inputs = s, a, r, t, s_
+        queue = tf.FIFOQueue(50, [i.dtype for i in inputs])
+        replay_sample = partial(self.replay.sample, batch_size=self.args.batch_size)
+        self.qt = EnqueueThread(self.sess, queue, replay_sample, inputs)
+        sample = queue.dequeue()
+        for s, i in zip(sample, inputs):
+            s.set_shape(i.get_shape())
+        return sample
+
+    def _def_model(self):
+        s, a, r, t, s_ = self._def_input()
         with tf.variable_scope("online"):
             q, ws, ys = self._build_net(s, collections="online")
         with tf.variable_scope("target"):
@@ -123,16 +138,13 @@ class DQN(object):
         })
 
     def update_target(self):
-        tf.get_default_session().run(self.model['update'])
+        self.sess.run(self.model['update'])
 
-    def train(self, s, a, r, t, s_):
-        tf.get_default_session().run(self.model['opt'], feed_dict={
-            self.model['ph'][0]: s,
-            self.model['ph'][1]: a,
-            self.model['ph'][2]: r,
-            self.model['ph'][3]: t,
-            self.model['ph'][4]: s_
-        })
+    def train(self):
+        if not self._train:
+            self.qt.start()
+            self._train = True
+        self.sess.run(self.model['opt'])
 
 
 agent = DQN()

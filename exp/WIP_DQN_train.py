@@ -17,8 +17,8 @@ def main():
     args = agent.parse_args()
     env, monitored_env = make_env(args.env)
     with agent.make_session():
-        agent.setup(env.action_space.n)
         replay_buffer = ReplayBuffer(args.replay_buffer_size)
+        agent.setup(env.action_space.n, replay_buffer)
         eps = LinearAnnealEpsilon(args.eps[0], args.eps[1], int(args.eps[2]))
         obs = env.reset()
         start_time, start_steps = None, None
@@ -29,19 +29,17 @@ def main():
             num_iters += 1
             action = agent.take_action(np.array(obs)[None], eps.get(num_iters))[0]
             obs_, reward, done, info = env.step(action)
-            replay_buffer.add(obs, action, reward, obs_, float(done))
+            replay_buffer.add(obs, action, reward, float(done), obs_)
             obs = obs_
             if done:
                 obs = env.reset()
             if num_iters % args.target_update_freq == 0:
                 agent.update_target()
 
-            if (num_iters > max(5 * args.batch_size, args.replay_buffer_size // 20) and
+            if (num_iters > min(10, max(5 * args.batch_size, args.replay_buffer_size // 20)) and
                             num_iters % args.learning_freq == 0):
-                # Sample a bunch of transitions from replay buffer
-                s, a, r, s_, t = replay_buffer.sample(args.batch_size)
                 # Minimize the error in Bellman's equation and compute TD-error
-                agent.train(s, a, r, t, s_)
+                agent.train()
 
             if info["steps"] > args.num_steps:
                 break

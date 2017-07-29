@@ -36,7 +36,7 @@ def main():
             if num_iters % args.target_update_freq == 0:
                 agent.update_target()
 
-            if (num_iters > min(10, max(5 * args.batch_size, args.replay_buffer_size // 20)) and
+            if (num_iters > max(5 * args.batch_size, args.replay_buffer_size // 20) and
                             num_iters % args.learning_freq == 0):
                 # Minimize the error in Bellman's equation and compute TD-error
                 agent.train()
@@ -59,7 +59,6 @@ def main():
                 record.add_key_value("Episodes", pretty_num(len(info["rewards"])))
                 record.add_key_value("Reward (100 epi mean)", np.round(np.mean(info["rewards"][-100:]), 2))
                 record.add_key_value("% Exploration", np.round(eps.get(num_iters) * 100, 2))
-                record.add_key_value("Queue size", agent.size_queue())
                 record.add_line("ETA: " + (pretty_eta(int(steps_left / fps_estimate.value))
                                            if fps_estimate.value is not None else "calculating..."))
 

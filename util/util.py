@@ -105,7 +105,7 @@ def pretty_num(num):
     if unit == '':
         return "{}".format(num)
     n = num / (10 ** mag)
-    return "{:.1f} {}".format(n, unit)
+    return "{:.2f} {}".format(n, unit)
 
 
 def pretty_eta(seconds_left):
@@ -178,3 +178,30 @@ class RunningAvg(object):
     def __float__(self):
         """Get the current estimate"""
         return self._value
+
+
+class Record(object):
+    def __init__(self):
+        self._info = []
+        self.format = {'kv': "|| {:>30} | {:>15} ||", 'l': "|| {:^48} ||"}
+
+    def clear(self):
+        self._info = []
+
+    def add_key_value(self, key, value):
+        self._info.append(('kv', key, value))
+
+    def add_line(self, line):
+        self._info.append(('l', '', line))
+
+    def dumps(self, indent=''):
+        record = ["=" * 54]
+        for t, k, v in self._info:
+            if t == 'kv':
+                record.append(self.format['kv'].format(k, v))
+            if t == 'l':
+                record.append(self.format['l'].format(v))
+        record.append("=" * 54)
+        s = indent + ('\n' + indent).join(record)
+        self._info = []
+        return s

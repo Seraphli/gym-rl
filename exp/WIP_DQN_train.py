@@ -3,7 +3,7 @@ import gym, numpy as np, time
 from util.env_wrapper import wrap_dqn, SimpleMonitor
 from util.replay_buffer import ReplayBuffer
 from util.epsilon import LinearAnnealEpsilon
-from util.util import main_logger, pretty_num, pretty_eta, RunningAvg
+from util.util import main_logger, pretty_num, pretty_eta, RunningAvg, Record
 
 
 def make_env(game_name):
@@ -24,6 +24,7 @@ def main():
         start_time, start_steps = None, None
         steps_per_iter = RunningAvg(0.999)
         iteration_time_est = RunningAvg(0.999)
+        record = Record()
         num_iters = 0
         while num_iters < args.num_steps:
             num_iters += 1
@@ -53,27 +54,19 @@ def main():
 
             if done:
                 steps_left = args.num_steps - info["steps"]
-                completion = np.round(info["steps"] / args.num_steps, 1)
-
-                record = "\n\t\t\t".join([
-                    "{:>15}  ||  % completion",
-                    "{:>15}  ||  steps",
-                    "{:>15}  ||  iters",
-                    "{:>15}  ||  episodes",
-                    "{:>15}  ||  reward (100 epi mean)",
-                    "{:>15}  ||  % exploration"
-                ]).format(
-                    completion,
-                    pretty_num(info["steps"]),
-                    pretty_num(num_iters),
-                    pretty_num(len(info["rewards"])),
-                    np.round(np.mean(info["rewards"][-100:]), 2),
-                    np.round(eps.get(num_iters) * 100, 2)
-                )
-                main_logger.info("\n\t\t\t" + record)
+                completion = np.round(info["steps"] / args.num_steps, 2)
                 fps_estimate = (float(steps_per_iter) / (float(iteration_time_est) + 1e-6)
                                 if steps_per_iter._value is not None else "calculating...")
-                main_logger.info("ETA: " + pretty_eta(int(steps_left / fps_estimate)))
+
+                record.add_key_value("% Completion", completion)
+                record.add_key_value("Steps", pretty_num(info["steps"]))
+                record.add_key_value("Iters", pretty_num(num_iters))
+                record.add_key_value("Episodes", pretty_num(len(info["rewards"])))
+                record.add_key_value("Reward (100 epi mean)", np.round(np.mean(info["rewards"][-100:]), 2))
+                record.add_key_value("% Exploration", np.round(eps.get(num_iters) * 100, 2))
+                record.add_line("ETA: " + pretty_eta(int(steps_left / fps_estimate)))
+
+                main_logger.info("\n" + record.dumps("\t\t\t"))
 
 
 if __name__ == '__main__':

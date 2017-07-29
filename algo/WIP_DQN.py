@@ -97,7 +97,8 @@ class DQN(object):
         t = tf.placeholder(tf.float32, [None, ], name='t')
         s_ = tf.placeholder(tf.uint8, [None, 84, 84, 4], name='s_')
         inputs = s, a, r, t, s_
-        queue = tf.FIFOQueue(50, [i.dtype for i in inputs])
+        self.queue = queue = tf.FIFOQueue(50, [i.dtype for i in inputs])
+        self.queue_size = queue.size()
         replay_sample = partial(self.replay.sample, batch_size=self.args.batch_size)
         self.qt = EnqueueThread(self.sess, queue, replay_sample, inputs)
         sample = queue.dequeue()
@@ -145,6 +146,9 @@ class DQN(object):
             self.qt.start()
             self._train = True
         self.sess.run(self.model['opt'])
+
+    def size_queue(self):
+        return self.sess.run(self.queue_size)
 
 
 agent = DQN()

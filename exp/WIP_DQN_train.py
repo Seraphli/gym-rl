@@ -23,29 +23,26 @@ def main():
         main_logger.info("Replay Buffer Max Size: {}B".format(pretty_num(args.replay_buffer_size * 56456, True)))
         eps = LinearAnnealEpsilon(args.eps[0], args.eps[1], int(args.eps[2]))
         obs = ep.reset()
-        start_time, start_steps = None, None
+        start_time, start_steps, total_step = None, None, None
         fps_estimate = RecentAvg(10)
         record = Record()
         num_iters = 0
         while num_iters < args.num_steps:
-            num_iters += ep.size
-            action = agent.take_action(obs, eps.get(num_iters))
+            num_iters += 1
+            action = agent.take_action(obs, eps.get(total_step if total_step else 0))
             obs_, reward, done, info = ep.step(action)
             [replay_buffer.add(obs[_], action[_], reward[_], float(done[_]), obs_[_]) for _ in range(ep.size)]
             obs, info = ep.auto_reset()
+            total_step = sum(info[_]['steps'] for _ in range(ep.size))
             if num_iters % args.target_update_freq == 0:
                 agent.update_target()
 
             if (num_iters > max(5 * args.batch_size, args.replay_buffer_size // 20) and
                             num_iters % args.learning_freq == 0):
                 # Minimize the error in Bellman's equation and compute TD-error
-                agent.train()
-
-            if num_iters > args.num_steps:
-                break
+                agent.train(ep.size)
 
             if done[0]:
-                total_step = sum(info[_]['steps'] for _ in range(ep.size))
                 total_epi = sum(len(info[_]['rewards']) for _ in range(ep.size))
                 mean_reward = np.mean(
                     [np.mean(info[_]["rewards"][-100:]) for _ in range(ep.size) if info[_]["rewards"]])
@@ -67,6 +64,9 @@ def main():
                                            if fps_estimate.value is not None else "calculating..."))
 
                 main_logger.info("\n" + record.dumps("\t\t\t"))
+
+            if total_step > args.num_steps:
+                break
 
 
 if __name__ == '__main__':

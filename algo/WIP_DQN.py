@@ -6,8 +6,9 @@ import argparse
 from util.tf_layer import tf_layer
 from util.util import main_logger, pretty_num
 from util.tf_common import huber_loss, minimize_and_clip
-from util.tf_input import EnqueueThread
+from util.tf_thread import EnqueueThread, OptThread
 from functools import partial
+from queue import Queue
 
 
 class DQN(object):
@@ -143,11 +144,14 @@ class DQN(object):
     def update_target(self):
         self.sess.run(self.model['update'])
 
-    def train(self):
+    def train(self, times=1):
         if not self._train:
             self.qt.start()
+            self.opt_queue = Queue()
+            OptThread(self.sess, self.opt_queue, self.model['opt']).start()
             self._train = True
-        self.sess.run(self.model['opt'])
+        for _ in range(times):
+            self.opt_queue.put("opt")
 
 
 agent = DQN()

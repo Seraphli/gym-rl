@@ -46,7 +46,7 @@ class DQN(object):
                             help="directory in which training state and model should be saved.")
 
         parser.add_argument('--eps', type=float, nargs=3, metavar=('INITIAL', 'FINAL', 'TOTAL'),
-                            default=[1.0, 0.1, 1e6],
+                            default=[1.0, 0.01, 1e7],
                             help="define epsilon, changing from initial value to final value in the total step")
 
         self.args = parser.parse_args()

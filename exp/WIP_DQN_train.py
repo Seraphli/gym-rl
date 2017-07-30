@@ -16,14 +16,15 @@ def make_env(game_name):
 
 def main():
     args = agent.parse_args()
-    ep = EnvPool(args.env, 2)
+    ep = EnvPool(args.env, 8)
     with agent.make_session():
         replay_buffer = ReplayBuffer(args.replay_buffer_size)
         agent.setup(ep.action_num, replay_buffer)
+        main_logger.info("Replay Buffer Max Size: {}B".format(pretty_num(args.replay_buffer_size * 56456, True)))
         eps = LinearAnnealEpsilon(args.eps[0], args.eps[1], int(args.eps[2]))
         obs = ep.reset()
         start_time, start_steps = None, None
-        fps_estimate = RecentAvg()
+        fps_estimate = RecentAvg(10)
         record = Record()
         num_iters = 0
         while num_iters < args.num_steps:
@@ -31,7 +32,7 @@ def main():
             action = agent.take_action(obs, eps.get(num_iters))
             obs_, reward, done, info = ep.step(action)
             [replay_buffer.add(obs[_], action[_], reward[_], float(done[_]), obs_[_]) for _ in range(ep.size)]
-            obs = ep.auto_reset()
+            obs, info = ep.auto_reset()
             if num_iters % args.target_update_freq == 0:
                 agent.update_target()
 
@@ -43,10 +44,11 @@ def main():
             if num_iters > args.num_steps:
                 break
 
-            if done[0] or done[1]:
+            if done[0]:
                 total_step = sum(info[_]['steps'] for _ in range(ep.size))
                 total_epi = sum(len(info[_]['rewards']) for _ in range(ep.size))
-                mean_reward = np.mean([np.mean(info[_]["rewards"][-100:]) for _ in range(ep.size)])
+                mean_reward = np.mean(
+                    [np.mean(info[_]["rewards"][-100:]) for _ in range(ep.size) if info[_]["rewards"]])
                 if start_time is not None:
                     steps_per_iter = total_step - start_steps
                     iteration_time = time.time() - start_time

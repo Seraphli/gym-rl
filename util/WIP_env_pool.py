@@ -35,7 +35,7 @@ class Env(object):
             self.obs = np.array(self.env.reset())
         else:
             self.obs = np.array(self.obs_)
-        return (self.obs,)
+        return self.obs, self.info
 
     def random_action(self):
         return self.env.action_space.sample()
@@ -110,7 +110,7 @@ class EnvPool(object):
 
     def auto_reset(self):
         self._put("auto_reset")
-        return self._get(1)
+        return self._get(2)
 
     def random(self):
         self._put("random")

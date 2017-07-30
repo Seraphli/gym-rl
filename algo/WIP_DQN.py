@@ -4,7 +4,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 import argparse
 from util.tf_layer import tf_layer
-from util.util import main_logger
+from util.util import main_logger, pretty_num
 from util.tf_common import huber_loss, minimize_and_clip
 from util.tf_input import EnqueueThread
 from functools import partial
@@ -31,7 +31,7 @@ class DQN(object):
         parser = argparse.ArgumentParser("DQN experiments for Atari games")
         parser.add_argument("--env", type=str, default="Pong", help="name of the game")
 
-        parser.add_argument("--replay-buffer-size", type=int, default=int(1e6), help="replay buffer size")
+        parser.add_argument("--replay-buffer-size", type=int, default=int(1e5), help="replay buffer size")
         parser.add_argument("--lr", type=float, default=1e-4, help="learning rate for Adam optimizer")
         parser.add_argument("--num-steps", type=int, default=int(2e8),
                             help="total number of steps to run the environment for")
@@ -90,7 +90,7 @@ class DQN(object):
             ws.append(w)
             ys.append(y)
             ms_size += m_size
-        main_logger.info("param: {}, memory size: {:.2f}MB".format(ms_size, ms_size * 4 / 1024 / 1024))
+        main_logger.info("param: {}, memory size: {}B".format(ms_size, pretty_num(ms_size * 4, True)))
         return y, ws, ys
 
     def _def_input(self):

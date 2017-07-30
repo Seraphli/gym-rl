@@ -1,6 +1,7 @@
 import gym
 from util.env_wrapper import wrap_dqn, SimpleMonitor
 import multiprocessing as mp
+import numpy as np
 
 gym.undo_logger_setup()
 
@@ -22,10 +23,19 @@ class Env(object):
         return self.env.action_space.n
 
     def reset(self):
-        return self.env.reset()
+        self.obs = np.array(self.env.reset())
+        return (self.obs,)
 
     def step(self, action):
-        return self.env.step(action)
+        self.obs_, self.reward, self.done, self.info = self.env.step(action)
+        return np.array(self.obs_), self.reward, self.done, self.info
+
+    def auto_reset(self):
+        if self.done:
+            self.obs = np.array(self.env.reset())
+        else:
+            self.obs = np.array(self.obs_)
+        return (self.obs,)
 
     def random_action(self):
         return self.env.action_space.sample()
@@ -68,33 +78,43 @@ class EnvPool(object):
             if cmd == "step":
                 a = queue[0].get()
                 queue[1].put(env.step(a))
+            if cmd == "auto_reset":
+                queue[1].put(env.auto_reset())
             if cmd == "random":
                 queue[1].put(env.step(env.random_action()))
 
-    def _put(self, cmd):
+    def _put(self, cmd, args=None):
         for i in range(self._size):
             self._env_queue[i][0].put_nowait(cmd)
+            if not (args is None):
+                self._env_queue[i][0].put_nowait(args[i])
 
-    def _get(self):
-        result = []
+    def _get(self, size):
+        results = [[] for _ in range(size)]
         for i in range(self._size):
-            result.append(self._env_queue[i][1].get())
-        return result
+            result = self._env_queue[i][1].get()
+            for _ in range(size):
+                results[_].append(result[_])
+        if size == 1:
+            return results[0]
+        return results
 
     def reset(self):
         self._put("reset")
-        return self._get()
+        return self._get(1)
 
     def step(self, actions):
         assert len(actions) == self._size
-        for i in range(self._size):
-            self._put("step")
-            self._put(actions[i])
-        return self._get()
+        self._put("step", actions)
+        return self._get(4)
+
+    def auto_reset(self):
+        self._put("auto_reset")
+        return self._get(1)
 
     def random(self):
         self._put("random")
-        return self._get()
+        return self._get(4)
 
     def exit(self):
-        self._put("random")
+        self._put("exit")

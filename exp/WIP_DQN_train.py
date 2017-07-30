@@ -16,7 +16,7 @@ def make_env(game_name):
 
 def main():
     args = agent.parse_args()
-    ep = EnvPool(args.env, 32)
+    ep = EnvPool(args.env, 2)
     with agent.make_session():
         replay_buffer = ReplayBuffer(args.replay_buffer_size)
         agent.setup(ep.action_num, replay_buffer)
@@ -31,7 +31,7 @@ def main():
             action = agent.take_action(obs, eps.get(num_iters))
             obs_, reward, done, info = ep.step(action)
             [replay_buffer.add(obs[_], action[_], reward[_], float(done[_]), obs_[_]) for _ in range(ep.size)]
-            obs = obs_
+            obs = ep.auto_reset()
             if num_iters % args.target_update_freq == 0:
                 agent.update_target()
 
@@ -43,8 +43,10 @@ def main():
             if num_iters > args.num_steps:
                 break
 
-            if done[0]:
+            if done[0] or done[1]:
                 total_step = sum(info[_]['steps'] for _ in range(ep.size))
+                total_epi = sum(len(info[_]['rewards']) for _ in range(ep.size))
+                mean_reward = np.mean([np.mean(info[_]["rewards"][-100:]) for _ in range(ep.size)])
                 if start_time is not None:
                     steps_per_iter = total_step - start_steps
                     iteration_time = time.time() - start_time
@@ -56,8 +58,8 @@ def main():
                 record.add_key_value("% Completion", completion)
                 record.add_key_value("Steps", pretty_num(total_step))
                 record.add_key_value("Iters", pretty_num(num_iters))
-                record.add_key_value("Episodes", pretty_num(len(info["rewards"])))
-                record.add_key_value("Reward (100 epi mean)", np.round(np.mean(info["rewards"][-100:]), 2))
+                record.add_key_value("Episodes", pretty_num(total_epi))
+                record.add_key_value("Reward (100 epi mean)", np.round(mean_reward, 2))
                 record.add_key_value("% Exploration", np.round(eps.get(num_iters) * 100, 2))
                 record.add_line("ETA: " + (pretty_eta(int(steps_left / fps_estimate.value))
                                            if fps_estimate.value is not None else "calculating..."))

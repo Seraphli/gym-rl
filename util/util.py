@@ -97,14 +97,14 @@ def load_config(name):
         return yaml.load(f)
 
 
-def pretty_num(num):
-    mags = [('', 0), ('k', 3), ('m', 6), ('g', 9), ('t', 12)]
-    for unit, mag in mags[::-1]:
-        if num > 10 ** mag:
+def pretty_num(num, bit=False):
+    mags = [('', 0, 0), ('K', 3, 10), ('M', 6, 20), ('G', 9, 30), ('T', 12, 40)]
+    for unit, mag, mag_bit in mags[::-1]:
+        if (not bit and num > 10 ** mag) or (bit and num > 2 ** mag_bit):
             break
     if unit == '':
         return "{}".format(num)
-    n = num / (10 ** mag)
+    n = num / (2 ** mag_bit) if bit else num / (10 ** mag)
     return "{:.2f} {}".format(n, unit)
 
 

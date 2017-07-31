@@ -1,10 +1,14 @@
+import os
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 import argparse
 from util.tf_layer import tf_layer
-from util.util import main_logger
+from util.util import main_logger, pretty_num
 from util.tf_common import huber_loss, minimize_and_clip
-from util.tf_input import EnqueueThread
+from util.tf_thread import EnqueueThread, OptThread
 from functools import partial
+from queue import Queue
 
 
 class DQN(object):
@@ -28,7 +32,7 @@ class DQN(object):
         parser = argparse.ArgumentParser("DQN experiments for Atari games")
         parser.add_argument("--env", type=str, default="Pong", help="name of the game")
 
-        parser.add_argument("--replay-buffer-size", type=int, default=int(1e6), help="replay buffer size")
+        parser.add_argument("--replay-buffer-size", type=int, default=int(1e5), help="replay buffer size")
         parser.add_argument("--lr", type=float, default=1e-4, help="learning rate for Adam optimizer")
         parser.add_argument("--num-steps", type=int, default=int(2e8),
                             help="total number of steps to run the environment for")
@@ -42,7 +46,7 @@ class DQN(object):
                             help="directory in which training state and model should be saved.")
 
         parser.add_argument('--eps', type=float, nargs=3, metavar=('INITIAL', 'FINAL', 'TOTAL'),
-                            default=[1.0, 0.1, 1e6],
+                            default=[1.0, 0.01, 1e7],
                             help="define epsilon, changing from initial value to final value in the total step")
 
         self.args = parser.parse_args()
@@ -87,7 +91,7 @@ class DQN(object):
             ws.append(w)
             ys.append(y)
             ms_size += m_size
-        main_logger.info("param: {}, memory size: {:.2f}MB".format(ms_size, ms_size * 4 / 1024 / 1024))
+        main_logger.info("param: {}, memory size: {}B".format(ms_size, pretty_num(ms_size * 4, True)))
         return y, ws, ys
 
     def _def_input(self):
@@ -140,11 +144,14 @@ class DQN(object):
     def update_target(self):
         self.sess.run(self.model['update'])
 
-    def train(self):
+    def train(self, times=1):
         if not self._train:
             self.qt.start()
+            self.opt_queue = Queue()
+            OptThread(self.sess, self.opt_queue, self.model['opt']).start()
             self._train = True
-        self.sess.run(self.model['opt'])
+        for _ in range(times):
+            self.opt_queue.put("opt")
 
 
 agent = DQN()

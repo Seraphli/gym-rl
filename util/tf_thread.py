@@ -1,5 +1,4 @@
 import threading
-import tensorflow as tf
 
 
 class EnqueueThread(threading.Thread):
@@ -18,3 +17,16 @@ class EnqueueThread(threading.Thread):
             data = self.sample()
             feed_dict = dict(zip(self.inputs, data))
             self.sess.run(self.op, feed_dict=feed_dict)
+
+
+class OptThread(threading.Thread):
+    def __init__(self, sess, queue, op):
+        super(OptThread, self).__init__()
+        self.daemon = True
+        self.sess = sess
+        self.queue = queue
+        self.op = op
+
+    def run(self):
+        while self.queue.get() == "opt":
+            self.sess.run(self.op)

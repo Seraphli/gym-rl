@@ -59,7 +59,7 @@ def main():
                 record.add_key_value("Iters", pretty_num(num_iters))
                 record.add_key_value("Episodes", pretty_num(total_epi))
                 record.add_key_value("Reward (100 epi mean)", np.round(mean_reward, 2))
-                record.add_key_value("% Exploration", np.round(eps.get(num_iters) * 100, 2))
+                record.add_key_value("% Exploration", np.round(eps.get(total_step if total_step else 0) * 100, 2))
                 record.add_line("ETA: " + (pretty_eta(int(steps_left / fps_estimate.value))
                                            if fps_estimate.value is not None else "calculating..."))
 

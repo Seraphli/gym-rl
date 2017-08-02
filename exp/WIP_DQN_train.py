@@ -13,8 +13,8 @@ def main():
         replay_buffer = ReplayBuffer(args.replay_buffer_size)
         agent.setup(ep.action_num, replay_buffer)
         main_logger.info("Replay Buffer Max Size: {}B".format(pretty_num(args.replay_buffer_size * 56456, True)))
-        eps = MultiStageEpsilon([LinearAnnealEpsilon(1.0, 0.1, int(1e6)),
-                                 LinearAnnealEpsilon(0.1, 0.01, int(1e7 - 1e6))])
+        eps = MultiStageEpsilon([LinearAnnealEpsilon(1.0, 0.1, int(1e7)),
+                                 LinearAnnealEpsilon(0.1, 0.01, int(5e7 - 1e7))])
         obs = ep.reset()
         start_time, start_steps, total_step = None, None, None
         fps_estimate = RecentAvg(10)

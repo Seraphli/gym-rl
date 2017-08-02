@@ -7,9 +7,13 @@ gym.undo_logger_setup()
 
 
 class Env(object):
-    def __init__(self, game_name, auto_reset=True):
+    def __init__(self, game_name):
+        """Build a gym environment.
+         
+        Args:
+            game_name (str): game_name (str): Name of the game        
+        """
         self._game_name = game_name
-        self._auto_reset = auto_reset
         env = gym.make(game_name + "NoFrameskip-v4")
         monitored_env = SimpleMonitor(env)
         self.env = wrap_dqn(monitored_env)  # applies a bunch of modification
@@ -43,6 +47,12 @@ class Env(object):
 
 class EnvPool(object):
     def __init__(self, game_name, size):
+        """Environment pool
+        
+        Args:
+            game_name (str): Name of the game
+            size (int): Size of environment pool 
+        """
         self._game_name = game_name
         self._size = size
         self.setup()

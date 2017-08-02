@@ -91,7 +91,9 @@ class EnvPool(object):
             if cmd == "auto_reset":
                 queue[1].put(env.auto_reset())
             if cmd == "random":
-                queue[1].put(env.step(env.random_action()))
+                a = env.random_action()
+                queue[1].put(a)
+                queue[1].put(env.step(a))
 
     def _put(self, cmd, args=None):
         for i in range(self._size):
@@ -124,7 +126,7 @@ class EnvPool(object):
 
     def random(self):
         self._put("random")
-        return self._get(4)
+        return self._get(1), self._get(4)
 
     def exit(self):
         self._put("exit")

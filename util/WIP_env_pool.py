@@ -44,6 +44,9 @@ class Env(object):
     def random_action(self):
         return self.env.action_space.sample()
 
+    def close(self):
+        self.env.close()
+
 
 class EnvPool(object):
     def __init__(self, game_name, size):
@@ -81,7 +84,8 @@ class EnvPool(object):
     def _env_loop(env, queue):
         while True:
             cmd = queue[0].get()
-            if cmd == "exit":
+            if cmd == "close":
+                env.close()
                 break
             if cmd == "reset":
                 queue[1].put(env.reset())
@@ -92,8 +96,9 @@ class EnvPool(object):
                 queue[1].put(env.auto_reset())
             if cmd == "random":
                 a = env.random_action()
-                queue[1].put(a)
+                queue[1].put((a,))
                 queue[1].put(env.step(a))
+        queue[1].put(("OK",))
 
     def _put(self, cmd, args=None):
         for i in range(self._size):
@@ -128,5 +133,6 @@ class EnvPool(object):
         self._put("random")
         return self._get(1), self._get(4)
 
-    def exit(self):
-        self._put("exit")
+    def close(self):
+        self._put("close")
+        return self._get(1)

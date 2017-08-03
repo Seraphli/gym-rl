@@ -36,8 +36,10 @@ class DQN(object):
 
         parser.add_argument("--replay-buffer-size", type=int, default=int(1e5), help="replay buffer size")
         parser.add_argument("--lr", type=float, default=1e-4, help="learning rate for Adam optimizer")
-        parser.add_argument("--num-steps", type=int, default=int(2e8),
-                            help="total number of steps to run the environment for")
+        # parser.add_argument("--num-steps", type=int, default=int(2e8),
+        #                     help="total number of steps to run the environment for")
+        parser.add_argument("--num-iters", type=int, default=800,
+                            help="total number of iterations to run the environment for")
         parser.add_argument("--batch-size", type=int, default=32,
                             help="number of transitions to optimize at the same time")
         parser.add_argument("--learning-freq", type=int, default=4,
@@ -56,7 +58,9 @@ class DQN(object):
         Returns:
             Session: tensorflow session
         """
-        self.sess = tf.Session()
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)
+        cfg = tf.ConfigProto(gpu_options=gpu_options)
+        self.sess = tf.Session(config=cfg)
         return self.sess
 
     def _def_net(self):

@@ -11,8 +11,8 @@ class Game(object):
     def __init__(self):
         self.args = args = agent.parse_args()
         ep = EnvPool(args.env, 1)
-        self.eps = [MultiStageEpsilon([LinearAnnealEpsilon(1.0, 0.1, int(1e7)),
-                                       LinearAnnealEpsilon(0.1, 0.05, int(6e7 - 1e7))]),
+        self.eps = [MultiStageEpsilon([LinearAnnealEpsilon(1.0, 0.1, int(1e6)),
+                                       LinearAnnealEpsilon(0.1, 0.05, int(1e7 - 1e6))]),
                     0]
         self.replay = ReplayBuffer(args.replay_buffer_size)
         main_logger.info("Replay Buffer Max Size: {}B".format(pretty_num(args.replay_buffer_size *
@@ -58,6 +58,7 @@ class Game(object):
             [np.mean(info[i]["rewards"][-100:]) for i in range(ep.size) if info[i]["rewards"]])
         record.add_key_value("% Completion", completion)
         record.add_key_value("Episodes", pretty_num(total_epi))
+        record.add_key_value("% Exploration", np.round(self.eps[0].get(self.train_epi * train_step) * 100, 2))
         record.add_key_value("Reward (100 epi mean)", np.round(mean_reward, 2))
         main_logger.info("\n" + record.dumps())
         ep.close()

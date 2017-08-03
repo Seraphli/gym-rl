@@ -98,7 +98,8 @@ class EnvPool(object):
                 a = env.random_action()
                 queue[1].put((a,))
                 queue[1].put(env.step(a))
-        queue[1].put(("OK",))
+        queue[0].close()
+        queue[1].close()
 
     def _put(self, cmd, args=None):
         for i in range(self._size):
@@ -135,4 +136,6 @@ class EnvPool(object):
 
     def close(self):
         self._put("close")
-        return self._get(1)
+        for p in self._ps:
+            p.join()
+        return

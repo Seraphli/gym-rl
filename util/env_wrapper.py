@@ -232,16 +232,7 @@ class SimpleMonitor(gym.Wrapper):
                 All the cumulative rewards for the episodes completed so far.
         """
         super().__init__(env)
-        # current episode state
-        self._current_reward = None
-        self._num_steps = None
-        # temporary monitor state that we do not save
-        self._time_offset = None
-        self._total_steps = None
-        # monitor state
-        self._episode_rewards = []
-        self._episode_lengths = []
-        self._episode_end_times = []
+        self.reset_state()
 
     def _reset(self):
         obs = self.env.reset()
@@ -272,6 +263,20 @@ class SimpleMonitor(gym.Wrapper):
         info['rewards'] = self._episode_rewards
         return (obs, rew, done, info)
 
+    def reset_state(self):
+        """Reset monitor state"""
+        # current episode state
+        self._current_reward = None
+        self._num_steps = None
+        # temporary monitor state that we do not save
+        self._time_offset = None
+        self._total_steps = None
+        # monitor state
+        self._episode_rewards = []
+        self._episode_lengths = []
+        self._episode_end_times = []
+        self.reset()
+
     def get_state(self):
         return {
             'env_id': self.env.unwrapped.spec.id,
@@ -289,3 +294,15 @@ class SimpleMonitor(gym.Wrapper):
         self._episode_rewards = ed['episode_rewards']
         self._episode_lengths = ed['episode_lengths']
         self._episode_end_times = ed['episode_end_times']
+
+
+if __name__ == '__main__':
+    env = gym.make("PongNoFrameskip-v4")
+    monitored_env = SimpleMonitor(env)
+    env = wrap_dqn(monitored_env)  # applies a bunch of modification
+
+    env.reset()
+    env.step(1)
+    monitored_env.reset_state()
+    env.reset()
+    env.step(1)

@@ -21,6 +21,7 @@ class Game(object):
         self.sess.__enter__()
         agent.setup(self.ep.action_num, self.replay)
         self.train_epi = 0
+        self.max_reward = agent.score
 
     def random(self):
         random_step = self.args.replay_buffer_size // 10
@@ -31,6 +32,14 @@ class Game(object):
                 [self.replay.add(obs[i], action[i], reward[i], float(done[i]), obs_[i]) for i in range(self.ep.size)]
                 obs, info = self.ep.auto_reset()
                 t.update(self.ep.size)
+        mean_reward = np.mean(
+            [np.mean(info[i]['rewards']) for i in range(self.ep.size) if info[i]['rewards']])
+        record = Record()
+        record.add_key_value('Phase', 'Random')
+        record.add_key_value('Mean Reward', np.round(mean_reward, 2))
+        main_logger.info("\n" + record.dumps())
+        if not self.max_reward:
+            self.max_reward = mean_reward
 
     def train(self):
         train_step = 250000
@@ -48,11 +57,12 @@ class Game(object):
                     agent.train(self.ep.size)
                 t.update(self.ep.size)
         self.train_epi += 1
-        record = Record()
         completion = np.round(self.train_epi / self.args.num_iters, 2)
         total_epi = sum(len(info[i]['rewards']) for i in range(self.ep.size))
         mean_reward = np.mean(
             [np.mean(info[i]['rewards'][-100:]) for i in range(self.ep.size) if info[i]['rewards']])
+        record = Record()
+        record.add_key_value('Phase', 'Train')
         record.add_key_value('% Completion', completion)
         record.add_key_value('Episodes', pretty_num(total_epi))
         record.add_key_value('% Exploration', np.round(self.eps[0].get(self.train_epi * train_step) * 100, 2))
@@ -69,13 +79,18 @@ class Game(object):
                 self.ep.step(action)
                 obs, info = self.ep.auto_reset()
                 t.update(self.ep.size)
-        record = Record()
         total_epi = sum(len(info[i]['rewards']) for i in range(self.ep.size))
         mean_reward = np.mean(
             [np.mean(info[i]['rewards']) for i in range(self.ep.size) if info[i]['rewards']])
+        record = Record()
+        record.add_key_value('Phase', 'Evaluation')
         record.add_key_value('Episodes', pretty_num(total_epi))
         record.add_key_value('Mean Reward', np.round(mean_reward, 2))
         main_logger.info("\n" + record.dumps())
+        if self.max_reward < mean_reward:
+            self.max_reward = mean_reward
+            agent.score = mean_reward
+            agent.save_model()
 
     def run(self):
         self.random()

@@ -36,8 +36,6 @@ class DQN(object):
 
         parser.add_argument("--replay-buffer-size", type=int, default=int(1e5), help="replay buffer size")
         parser.add_argument("--lr", type=float, default=1e-4, help="learning rate for Adam optimizer")
-        # parser.add_argument("--num-steps", type=int, default=int(2e8),
-        #                     help="total number of steps to run the environment for")
         parser.add_argument("--num-iters", type=int, default=800,
                             help="total number of iterations to run the environment for")
         parser.add_argument("--batch-size", type=int, default=32,

@@ -117,10 +117,10 @@ class DQN(object):
 
     def _def_model(self):
         s, a, r, t, s_ = self._def_input()
-        with tf.variable_scope("online"):
-            q, ws, ys = self._build_net(s, collections="online")
-        with tf.variable_scope("target"):
-            q_, ws_, ys_ = self._build_net(s_, collections="target")
+        with tf.variable_scope('online'):
+            q, ws, ys = self._build_net(s, collections='online')
+        with tf.variable_scope('target'):
+            q_, ws_, ys_ = self._build_net(s_, collections='target')
         o_vars = [_w for w in ws if w for _w in w]
         t_vars = [_w for w in ws_ if w for _w in w]
         q_value = tf.reduce_sum(q * tf.one_hot(a, self.action_n), 1)
@@ -157,7 +157,7 @@ class DQN(object):
             OptThread(self.sess, self.opt_queue, self.model['opt']).start()
             self._train = True
         for _ in range(times):
-            self.opt_queue.put("opt")
+            self.opt_queue.put('opt')
 
 
 agent = DQN()

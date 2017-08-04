@@ -24,7 +24,7 @@ class Game(object):
         self.max_reward = agent.score
 
     def random(self):
-        random_step = self.args.replay_buffer_size // 10
+        random_step = self.args.replay_buffer_size // 2
         obs = self.ep.reset()
         with tqdm(total=random_step, desc="random", ascii=True) as t:
             while t.n < random_step:
@@ -32,10 +32,12 @@ class Game(object):
                 [self.replay.add(obs[i], action[i], reward[i], float(done[i]), obs_[i]) for i in range(self.ep.size)]
                 obs, info = self.ep.auto_reset()
                 t.update(self.ep.size)
+        total_epi = sum(len(info[i]['rewards']) for i in range(self.ep.size))
         mean_reward = np.mean(
             [np.mean(info[i]['rewards']) for i in range(self.ep.size) if info[i]['rewards']])
         record = Record()
         record.add_key_value('Phase', 'Random')
+        record.add_key_value('Episodes', pretty_num(total_epi))
         record.add_key_value('Mean Reward', np.round(mean_reward, 2))
         main_logger.info("\n" + record.dumps())
         if not self.max_reward:

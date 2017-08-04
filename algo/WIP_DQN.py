@@ -29,13 +29,15 @@ class DQN(object):
         sess.run(self.model['update'])
 
     def parse_args(self):
+        """Arguments for command line"""
         parser = argparse.ArgumentParser("DQN experiments for Atari games")
         parser.add_argument("--env", type=str, default="Pong", help="name of the game")
+        parser.add_argument("--env-size", type=int, default=8, help="number of the environment")
 
         parser.add_argument("--replay-buffer-size", type=int, default=int(1e5), help="replay buffer size")
         parser.add_argument("--lr", type=float, default=1e-4, help="learning rate for Adam optimizer")
-        parser.add_argument("--num-steps", type=int, default=int(2e8),
-                            help="total number of steps to run the environment for")
+        parser.add_argument("--num-iters", type=int, default=800,
+                            help="total number of iterations to run the environment for")
         parser.add_argument("--batch-size", type=int, default=32,
                             help="number of transitions to optimize at the same time")
         parser.add_argument("--learning-freq", type=int, default=4,
@@ -45,18 +47,22 @@ class DQN(object):
         parser.add_argument("--save-dir", type=str, default=None,
                             help="directory in which training state and model should be saved.")
 
-        parser.add_argument('--eps', type=float, nargs=3, metavar=('INITIAL', 'FINAL', 'TOTAL'),
-                            default=[1.0, 0.01, 1e7],
-                            help="define epsilon, changing from initial value to final value in the total step")
-
         self.args = parser.parse_args()
         return self.args
 
     def make_session(self):
-        self.sess = tf.Session()
+        """Make and return a tensorflow session
+        
+        Returns:
+            Session: tensorflow session
+        """
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.5)
+        cfg = tf.ConfigProto(gpu_options=gpu_options)
+        self.sess = tf.Session(config=cfg)
         return self.sess
 
     def _def_net(self):
+        """Definition of network architecture"""
         self.arch = [
             {'layer': 'conv2d', 'kernel_size': [8, 8], 'input': 4, 'output': 32, 'stride': [4, 4]},
             {'layer': 'relu'},

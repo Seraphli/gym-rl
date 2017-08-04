@@ -1,138 +1,149 @@
-import gym, multiprocessing as mp
+import gym
+from util.env_wrapper import wrap_dqn, SimpleMonitor
+import multiprocessing as mp
+import numpy as np
 
 gym.undo_logger_setup()
 
 
 class Env(object):
-    def __init__(self, env_name, preprocessor=None, use_lives=True):
-        self._env_name = env_name
-        self._preprocessor = preprocessor
-        self._use_lives = use_lives
-        self._env = gym.make(self._env_name)
-        self._no_op = 30
-        self._last_action = 0
-        self._no_op_count = 0
-        self.reset()
+    def __init__(self, game_name):
+        """Build a gym environment.
+         
+        Args:
+            game_name (str): game_name (str): Name of the game        
+        """
+        self._game_name = game_name
+        env = gym.make(game_name + "NoFrameskip-v4")
+        self.monitored_env = SimpleMonitor(env)
+        self.env = wrap_dqn(self.monitored_env)  # applies a bunch of modification
 
     @property
     def name(self):
-        return self._env.spec.id
+        return self.env.spec.id
 
     @property
     def action_num(self):
-        return self._env.action_space.n
+        return self.env.action_space.n
 
     def reset(self):
-        self.state = "Reset"
-        self.observation = self._env.reset()
-        if self._preprocessor:
-            self.observation = self._preprocessor.process(self.observation)
-        self.frame = 0
-        self.score = .0
-        self._lives = -1
+        self.obs = np.array(self.env.reset())
+        return (self.obs,)
 
-    def random_action(self):
-        return self._env.action_space.sample()
+    def reset_state(self):
+        self.monitored_env.reset_state()
 
     def step(self, action):
-        if action == self._last_action:
-            self._no_op_count += 1
-            if self._no_op_count == self._no_op:
-                while self.action == self._last_action:
-                    self.action = self.random_action()
-                self._no_op_count = 0
-            else:
-                self.action = action
-        else:
-            self.action = action
-        self.observation_, self.reward, self.done, self.info = self._env.step(self.action)
-        if self._use_lives:
-            if self._lives == -1:
-                self._lives = self.info["ale.lives"]
-                self.t = False
-            elif self._lives > self.info["ale.lives"] or self.done:
-                self._lives = self.info["ale.lives"]
-                self.t = True
-            else:
-                self.t = False
-        else:
-            self.t = self.done
-        self.transition = (self.observation, self.action, self.reward, self.t)
-        self.frame += 1
-        self.score += self.reward
-        result = self.done, self.transition, self.frame, self.score
-        self.observation = self.observation_
-        if self._preprocessor:
-            self.observation = self._preprocessor.process(self.observation)
+        self.obs_, self.reward, self.done, self.info = self.env.step(action)
+        return np.array(self.obs_), self.reward, self.done, self.info
+
+    def auto_reset(self):
         if self.done:
-            self.reset()
-        return result
+            self.obs = np.array(self.env.reset())
+        else:
+            self.obs = np.array(self.obs_)
+        return self.obs, self.info
+
+    def random_action(self):
+        return self.env.action_space.sample()
+
+    def close(self):
+        self.env.close()
 
 
 class EnvPool(object):
-    def __init__(self, env_name, size, preprocessor=None, use_lives=True):
-        self._env_name = env_name
+    def __init__(self, game_name, size):
+        """Environment pool
+        
+        Args:
+            game_name (str): Name of the game
+            size (int): Size of environment pool 
+        """
+        self._game_name = game_name
         self._size = size
-        self._preprocessor = preprocessor
-        self._use_lives = use_lives
         self.setup()
 
     def setup(self):
-        self._envs = [Env(self._env_name, self._preprocessor, self._use_lives) for _ in range(self._size)]
+        self._envs = [Env(self._game_name) for _ in range(self._size)]
         self._env_queue = [[mp.Queue(), mp.Queue()] for _ in range(self._size)]
         self._ps = [mp.Process(target=EnvPool._env_loop, args=(self._envs[_], self._env_queue[_]), daemon=True)
                     for _ in range(self._size)]
         for p in self._ps:
             p.start()
 
+    @property
+    def size(self):
+        return self._size
+
+    @property
+    def name(self):
+        return self._envs[0].name
+
+    @property
+    def action_num(self):
+        return self._envs[0].action_num
+
     @staticmethod
     def _env_loop(env, queue):
         while True:
             cmd = queue[0].get()
-            if cmd == "exit":
+            if cmd == "close":
+                env.close()
                 break
             if cmd == "reset":
-                env.reset()
-            if cmd == "before":
-                queue[1].put(env.observation)
+                queue[1].put(env.reset())
+            if cmd == "reset_state":
+                env.reset_state()
             if cmd == "step":
                 a = queue[0].get()
                 queue[1].put(env.step(a))
+            if cmd == "auto_reset":
+                queue[1].put(env.auto_reset())
             if cmd == "random":
-                queue[1].put(env.step(env.random_action()))
+                a = env.random_action()
+                queue[1].put((a,))
+                queue[1].put(env.step(a))
+        queue[0].close()
+        queue[1].close()
 
-    def close(self):
+    def _put(self, cmd, args=None):
         for i in range(self._size):
-            self._env_queue[i][0].put_nowait("exit")
-        for p in self._ps:
-            p.join()
+            self._env_queue[i][0].put_nowait(cmd)
+            if not (args is None):
+                self._env_queue[i][0].put_nowait(args[i])
+
+    def _get(self, size):
+        results = [[] for _ in range(size)]
+        for i in range(self._size):
+            result = self._env_queue[i][1].get()
+            for _ in range(size):
+                results[_].append(result[_])
+        if size == 1:
+            return results[0]
+        return results
 
     def reset(self):
-        for i in range(self._size):
-            self._env_queue[i][0].put_nowait("reset")
+        self._put("reset")
+        return self._get(1)
 
-    def before_step(self):
-        for i in range(self._size):
-            self._env_queue[i][0].put_nowait("before")
-        result = []
-        for i in range(self._size):
-            result.append(self._env_queue[i][1].get())
-        return result
+    def reset_state(self):
+        self._put("reset_state")
 
     def step(self, actions):
         assert len(actions) == self._size
-        for i in range(self._size):
-            self._env_queue[i][0].put_nowait("step")
-            self._env_queue[i][0].put_nowait(actions[i])
-        result = []
-        for i in range(self._size):
-            result.append(self._env_queue[i][1].get())
-        return result
+        self._put("step", actions)
+        return self._get(4)
+
+    def auto_reset(self):
+        self._put("auto_reset")
+        return self._get(2)
 
     def random(self):
-        for i in range(self._size):
-            self._env_queue[i][0].put_nowait("random")
-        result = []
-        for i in range(self._size):
-            result.append(self._env_queue[i][1].get())
-        return result
+        self._put("random")
+        return self._get(1), self._get(4)
+
+    def close(self):
+        self._put("close")
+        for p in self._ps:
+            p.join()
+        return

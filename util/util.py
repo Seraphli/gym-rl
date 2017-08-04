@@ -78,7 +78,7 @@ def init_logger(name):
     ch.setFormatter(cformatter)
 
     rf = logging.handlers.RotatingFileHandler(get_path('log') + '/' + name + '.log',
-                                              maxBytes=1 * 1024 * 1024,
+                                              maxBytes=5 * 1024 * 1024,
                                               backupCount=5)
     rf.setLevel(logging.DEBUG)
     rf.setFormatter(nformatter)

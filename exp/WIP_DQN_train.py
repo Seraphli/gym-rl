@@ -60,7 +60,7 @@ class Game(object):
         main_logger.info("\n" + record.dumps())
 
     def test(self):
-        test_step = 125000
+        test_step = 200000
         self.ep.reset_state()
         obs = self.ep.reset()
         with tqdm(total=test_step, desc="Evaluation", ascii=True) as t:

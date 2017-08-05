@@ -46,8 +46,6 @@ class DQN(object):
                             help="number of iterations between every optimization step")
         parser.add_argument("--target-update-freq", type=int, default=40000,
                             help="number of iterations between every target network update")
-        parser.add_argument("--save-dir", type=str, default=None,
-                            help="directory in which training state and model should be saved.")
 
         self.args = parser.parse_args()
         return self.args
@@ -162,11 +160,11 @@ class DQN(object):
             self.opt_queue.put('opt')
 
     def load_model(self):
-        self.saver = tf.train.Saver()
+        self.saver = tf.train.Saver(max_to_keep=50)
         model_path = get_path('tflog/' + self.algorithm + '/' + self.args.env)
         subdir = next(os.walk(model_path))[1]
         if subdir:
-            cmd = input("Found saved model(s), do you want to load? [y/N]")
+            cmd = input("Found {} saved model(s), do you want to load? [y/N]".format(len(subdir)))
             if 'y' in cmd or 'Y' in cmd:
                 if len(subdir) > 1:
                     print("Choose one:")
@@ -189,16 +187,17 @@ class DQN(object):
                     self.score = state['score']
                     return True
         self.score = None
+        main_logger.info("No model loaded")
         return False
 
     def save_model(self):
         save_path = get_path('tflog/' + self.algorithm
                              + '/' + self.args.env
                              + '/' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
-        main_logger.info("Save model at {} with score {}".format(save_path, self.score))
+        main_logger.info("Save model at {} with score {:.2f}".format(save_path, self.score))
         self.saver.save(self.sess, save_path + '/model.ckpt')
-        with open(save_path + '/state.json') as f:
-            json.dump({'score': self.score}, f)
+        with open(save_path + '/state.json', 'w') as f:
+            json.dump({'score': self.score, 'args': self.args}, f)
 
 
 agent = DQN()

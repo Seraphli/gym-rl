@@ -131,14 +131,14 @@ class DQN(object):
         optimize_expr = minimize_and_clip(optimizer, errors, var_list=o_vars)
         with tf.variable_scope('update_params'):
             update_expr = [tf.assign(t, o) for t, o in zip(t_vars, o_vars)]
-            update_params = tf.group(*update_expr)
-        eps = tf.placeholder(tf.float32, [], name='t')
+        update_params = tf.group(*update_expr, name='update')
+        eps = tf.placeholder(tf.float32, [], name='eps')
         with tf.variable_scope('action'):
             batch_size = tf.shape(s)[0]
             random_actions = tf.random_uniform(tf.stack([batch_size]), minval=0, maxval=self.action_n, dtype=tf.int64)
             deterministic_actions = tf.argmax(q, axis=1)
             chose_random = tf.random_uniform(tf.stack([batch_size]), minval=0, maxval=1, dtype=tf.float32) < eps
-            actions = tf.where(chose_random, random_actions, deterministic_actions)
+        actions = tf.where(chose_random, random_actions, deterministic_actions, name='act')
         return {'ph': [s, a, r, t, s_], 'eps': eps, 'act': actions, 'opt': optimize_expr, 'update': update_params}
 
     def take_action(self, observation, epsilon):
@@ -161,7 +161,7 @@ class DQN(object):
 
     def load_model(self):
         self.saver = tf.train.Saver(max_to_keep=50)
-        model_path = get_path('tflog/' + self.algorithm + '/' + self.args.env)
+        model_path = get_path('model/' + self.algorithm + '/' + self.args.env)
         subdir = next(os.walk(model_path))[1]
         if subdir:
             cmd = input("Found {} saved model(s), do you want to load? [y/N]".format(len(subdir)))
@@ -191,13 +191,13 @@ class DQN(object):
         return False
 
     def save_model(self):
-        save_path = get_path('tflog/' + self.algorithm
+        save_path = get_path('model/' + self.algorithm
                              + '/' + self.args.env
                              + '/' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
         main_logger.info("Save model at {} with score {:.2f}".format(save_path, self.score))
         self.saver.save(self.sess, save_path + '/model.ckpt')
         with open(save_path + '/state.json', 'w') as f:
-            json.dump({'score': self.score, 'args': self.args}, f)
+            json.dump({'score': self.score, 'args': vars(self.args)}, f)
 
 
 agent = DQN()

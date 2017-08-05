@@ -12,6 +12,21 @@ Environment pool size and replay buffer size will effect memory usage
 
 The memory usage using default setting is ~7GB
 
+## How to run
+
+Recommend **Virtualenv**
+```bash
+git clone https://github.com/Seraphli/gym-rl.git
+cd gym-rl
+pip install -r requirement.txt
+PYTHONPATH=. python exp/WIP_DQN_train.py
+```
+
+See help for more information and configuration
+```
+PYTHONPATH=. python exp/WIP_DQN_train.py --help
+```
+
 ## Thanks
 
 [baselines][1]

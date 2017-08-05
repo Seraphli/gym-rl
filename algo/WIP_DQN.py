@@ -4,16 +4,18 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 import argparse
 from util.tf_layer import tf_layer
-from util.util import main_logger, pretty_num
+from util.util import main_logger, pretty_num, get_path
 from util.tf_common import huber_loss, minimize_and_clip
 from util.tf_thread import EnqueueThread, OptThread
 from functools import partial
 from queue import Queue
+import json
+import datetime
 
 
 class DQN(object):
     def __init__(self):
-        self.algo = 'DQN'
+        self.algorithm = 'DQN'
 
     def setup(self, action_n, replay):
         self.action_n = action_n
@@ -22,11 +24,11 @@ class DQN(object):
         self.gamma = 0.99
         self._def_net()
         self.model = self._def_model()
-        sess = tf.get_default_session()
-        init = tf.global_variables_initializer()
-        sess.run(init)
-        sess.graph.finalize()
-        sess.run(self.model['update'])
+        if not self.load_model():
+            init = tf.global_variables_initializer()
+            self.sess.run(init)
+        self.sess.graph.finalize()
+        self.sess.run(self.model['update'])
 
     def parse_args(self):
         """Arguments for command line"""
@@ -44,8 +46,6 @@ class DQN(object):
                             help="number of iterations between every optimization step")
         parser.add_argument("--target-update-freq", type=int, default=40000,
                             help="number of iterations between every target network update")
-        parser.add_argument("--save-dir", type=str, default=None,
-                            help="directory in which training state and model should be saved.")
 
         self.args = parser.parse_args()
         return self.args
@@ -158,6 +158,46 @@ class DQN(object):
             self._train = True
         for _ in range(times):
             self.opt_queue.put('opt')
+
+    def load_model(self):
+        self.saver = tf.train.Saver(max_to_keep=50)
+        model_path = get_path('tflog/' + self.algorithm + '/' + self.args.env)
+        subdir = next(os.walk(model_path))[1]
+        if subdir:
+            cmd = input("Found {} saved model(s), do you want to load? [y/N]".format(len(subdir)))
+            if 'y' in cmd or 'Y' in cmd:
+                if len(subdir) > 1:
+                    print("Choose one:")
+                    for i in range(len(subdir)):
+                        state_fn = model_path + '/' + subdir[i] + '/state.json'
+                        with open(state_fn, 'r') as f:
+                            state = json.load(f)
+                        print("[{}]: Score: {}, Path: {}".format(i, state['score'], subdir[i]))
+                    load_path = model_path + '/' + subdir[int(input("Index:"))]
+                else:
+                    load_path = model_path + '/' + subdir[0]
+                state_fn = load_path + '/state.json'
+                with open(state_fn, 'r') as f:
+                    state = json.load(f)
+                checkpoint = tf.train.get_checkpoint_state(load_path)
+                if checkpoint and checkpoint.model_checkpoint_path:
+                    self.saver.restore(self.sess, checkpoint.model_checkpoint_path)
+                    main_logger.info("Successfully loaded model: Score: {}, Path: {}".
+                                     format(state['score'], checkpoint.model_checkpoint_path))
+                    self.score = state['score']
+                    return True
+        self.score = None
+        main_logger.info("No model loaded")
+        return False
+
+    def save_model(self):
+        save_path = get_path('tflog/' + self.algorithm
+                             + '/' + self.args.env
+                             + '/' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
+        main_logger.info("Save model at {} with score {:.2f}".format(save_path, self.score))
+        self.saver.save(self.sess, save_path + '/model.ckpt')
+        with open(save_path + '/state.json', 'w') as f:
+            json.dump({'score': self.score, 'args': self.args}, f)
 
 
 agent = DQN()

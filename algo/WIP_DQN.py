@@ -107,10 +107,10 @@ class DQN(object):
         t = tf.placeholder(tf.float32, [None, ], name='t')
         s_ = tf.placeholder(tf.uint8, [None, 84, 84, 4], name='s_')
         inputs = s, a, r, t, s_
-        self.queue = queue = tf.FIFOQueue(50, [i.dtype for i in inputs])
+        self.queue = queue = tf.FIFOQueue(50, [i.dtype for i in inputs], name='queue')
         replay_sample = partial(self.replay.sample, batch_size=self.args.batch_size)
         self.qt = EnqueueThread(self.sess, queue, replay_sample, inputs)
-        sample = queue.dequeue()
+        sample = queue.dequeue(name='dequeue')
         for s, i in zip(sample, inputs):
             s.set_shape(i.get_shape())
         return sample
@@ -124,7 +124,7 @@ class DQN(object):
         o_vars = [_w for w in ws if w for _w in w]
         t_vars = [_w for w in ws_ if w for _w in w]
         q_value = tf.reduce_sum(q * tf.one_hot(a, self.action_n), 1)
-        q_target = r + (1. - t) * self.gamma * tf.reduce_max(q_, axis=1, name='Qmax_s_')
+        q_target = r + (1. - t) * self.gamma * tf.reduce_max(q_, axis=1, name='q_max_s_')
         td_error = tf.stop_gradient(q_target) - q_value
         errors = huber_loss(td_error)
         optimizer = tf.train.AdamOptimizer(learning_rate=self.args.lr, epsilon=1e-4)
@@ -142,7 +142,7 @@ class DQN(object):
         return {'ph': [s, a, r, t, s_], 'eps': eps, 'act': actions, 'opt': optimize_expr, 'update': update_params}
 
     def take_action(self, observation, epsilon):
-        return tf.get_default_session().run(self.model['act'], feed_dict={
+        return self.sess.run(self.model['act'], feed_dict={
             self.model['ph'][0]: observation,
             self.model['eps']: epsilon
         })
@@ -173,7 +173,7 @@ class DQN(object):
                         with open(state_fn, 'r') as f:
                             state = json.load(f)
                         print("[{}]: Score: {}, Path: {}".format(i, state['score'], subdir[i]))
-                    load_path = model_path + '/' + subdir[int(input("Index:"))]
+                    load_path = model_path + '/' + subdir[int(input("Index: "))]
                 else:
                     load_path = model_path + '/' + subdir[0]
                 state_fn = load_path + '/state.json'

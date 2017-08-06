@@ -294,15 +294,3 @@ class SimpleMonitor(gym.Wrapper):
         self._episode_rewards = ed['episode_rewards']
         self._episode_lengths = ed['episode_lengths']
         self._episode_end_times = ed['episode_end_times']
-
-
-if __name__ == '__main__':
-    env = gym.make("PongNoFrameskip-v4")
-    monitored_env = SimpleMonitor(env)
-    env = wrap_dqn(monitored_env)  # applies a bunch of modification
-
-    env.reset()
-    env.step(1)
-    monitored_env.reset_state()
-    env.reset()
-    env.step(1)

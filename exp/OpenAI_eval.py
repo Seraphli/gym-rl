@@ -1,4 +1,6 @@
 import os
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import json
 import glob
 import argparse
@@ -8,8 +10,16 @@ from gym import wrappers
 import datetime
 import numpy as np
 from util.util import get_path, boolean_flag, main_logger, Record
+from util.env_wrapper import ProcessFrame84, FrameStack
 
 cfg_fn = get_path('cfg') + '/OpenAI.json'
+
+
+def wrap_dqn(env):
+    """Apply a common set of wrappers for Atari games."""
+    env = ProcessFrame84(env)
+    env = FrameStack(env, 4)
+    return env
 
 
 def parse_args():
@@ -32,8 +42,8 @@ def load_model(args):
     model_path = get_path('model/' + args.algo + '/' + args.env)
     subdir = next(os.walk(model_path))[1]
     if subdir:
-        cmd = input("Found {} saved model(s), do you want to load? [y/N]".format(len(subdir)))
-        if 'y' in cmd or 'Y' in cmd:
+        cmd = input("Found {} saved model(s), do you want to load? [Y/n]".format(len(subdir)))
+        if not ('n' in cmd or 'N' in cmd):
             if len(subdir) > 1:
                 print("Choose one:")
                 for i in range(len(subdir)):
@@ -41,7 +51,7 @@ def load_model(args):
                     with open(state_fn, 'r') as f:
                         state = json.load(f)
                     print("[{}]: Score: {}, Path: {}".format(i, state['score'], subdir[i]))
-                load_path = model_path + '/' + subdir[int(input("Index:"))]
+                load_path = model_path + '/' + subdir[int(input("Index: "))]
             else:
                 load_path = model_path + '/' + subdir[0]
             state_fn = load_path + '/state.json'
@@ -60,19 +70,14 @@ def load_model(args):
 
 def build_graph():
     graph = tf.get_default_graph()
-    s = graph.get_tensor_by_name('s')
-    a = graph.get_tensor_by_name('a')
-    r = graph.get_tensor_by_name('r')
-    t = graph.get_tensor_by_name('t')
-    s_ = graph.get_tensor_by_name('s_')
-    eps = graph.get_tensor_by_name('eps')
-    actions = graph.get_tensor_by_name('act')
-    optimize_expr = graph.get_tensor_by_name('opt')
-    update_params = graph.get_tensor_by_name('update')
-    return {'ph': [s, a, r, t, s_], 'eps': eps, 'act': actions, 'opt': optimize_expr, 'update': update_params}
+    s = graph.get_tensor_by_name('dequeue:0')
+    eps = graph.get_tensor_by_name('eps:0')
+    actions = graph.get_tensor_by_name('act:0')
+    return {'ph': [s], 'eps': eps, 'act': actions}
 
 
 def main():
+    gym.undo_logger_setup()
     args = parse_args()
     with open(cfg_fn, 'w') as f:
         json.dump({'APIKey': args.api_key}, f)
@@ -85,6 +90,7 @@ def main():
     save_path = get_path('tmp/openai_eval/' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
     main_logger.info("Evaluation will store in `{}`".format(save_path))
     env = wrappers.Monitor(env, save_path)
+    env = wrap_dqn(env)
     rewards = []
     for i_episode in range(150):
         observation = env.reset()
@@ -93,7 +99,7 @@ def main():
         while True:
             step += 1
             action = sess.run(model['act'], feed_dict={
-                model['ph'][0]: observation,
+                model['ph'][0]: np.array(observation)[None],
                 model['eps']: 0})[0]
             observation, reward, done, info = env.step(action)
             epi_reward += reward

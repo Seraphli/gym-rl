@@ -88,7 +88,7 @@ def main():
     model = build_graph()
     env = gym.make(args.env + '-v0')
     save_path = get_path('tmp/openai_eval/' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
-    main_logger.info("Evaluation will store in `{}`".format(save_path))
+    main_logger.info("Evaluation will be stored in `{}`".format(save_path))
     env = wrappers.Monitor(env, save_path)
     env = wrap_dqn(env)
     rewards = []

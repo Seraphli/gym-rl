@@ -112,6 +112,7 @@ def main():
                 record.add_key_value('Reward (100 epi mean)', np.round(np.mean(rewards[-100:]), 2))
                 main_logger.info("\n" + record.dumps())
                 break
+    env.close()
     gym.upload(save_path, api_key=args.api_key)
     main_logger.info("Evaluation complete")
 

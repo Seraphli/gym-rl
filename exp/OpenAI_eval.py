@@ -10,22 +10,15 @@ from gym import wrappers
 import datetime
 import numpy as np
 from util.util import get_path, boolean_flag, main_logger, Record
-from util.env_wrapper import ProcessFrame84, FrameStack
+from util.env_wrapper import wrap_gym
 
 cfg_fn = get_path('cfg') + '/OpenAI.json'
-
-
-def wrap_dqn(env):
-    """Apply a common set of wrappers for Atari games."""
-    env = ProcessFrame84(env)
-    env = FrameStack(env, 4)
-    return env
 
 
 def parse_args():
     parser = argparse.ArgumentParser("OpenAI evaluation script")
     parser.add_argument("--algo", type=str, default="DQN", choices=["DQN"], help="name of the algorithm")
-    parser.add_argument("--env", type=str, default="Pong", help="name of the game")
+    parser.add_argument("--env", type=str, default="Pong-v0", help="name of the game")
 
     if os.path.exists(cfg_fn):
         with open(cfg_fn, 'r') as f:
@@ -86,11 +79,11 @@ def main():
         main_logger.info("Evaluation exit")
         return
     model = build_graph()
-    env = gym.make(args.env + '-v0')
+    env = gym.make(args.env)
     save_path = get_path('tmp/openai_eval/' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
     main_logger.info("Evaluation will be stored in `{}`".format(save_path))
     env = wrappers.Monitor(env, save_path)
-    env = wrap_dqn(env)
+    env = wrap_gym(env)
     rewards = []
     for i_episode in range(150):
         observation = env.reset()

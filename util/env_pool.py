@@ -1,5 +1,5 @@
 import gym
-from util.env_wrapper import wrap_dqn, SimpleMonitor
+from util.env_wrapper import wrap_dqn, wrap_gym, SimpleMonitor
 import multiprocessing as mp
 import numpy as np
 
@@ -14,9 +14,14 @@ class Env(object):
             game_name (str): game_name (str): Name of the game        
         """
         self._game_name = game_name
-        env = gym.make(game_name + "NoFrameskip-v4")
-        self.monitored_env = SimpleMonitor(env)
-        self.env = wrap_dqn(self.monitored_env)  # applies a bunch of modification
+        if '-v0' in game_name:
+            env = gym.make(game_name)
+            self.monitored_env = SimpleMonitor(env)
+            self.env = wrap_gym(self.monitored_env)  # applies a bunch of modification
+        else:
+            env = gym.make(game_name + "NoFrameskip-v4")
+            self.monitored_env = SimpleMonitor(env)
+            self.env = wrap_dqn(self.monitored_env)  # applies a bunch of modification
 
     @property
     def name(self):

@@ -34,6 +34,8 @@ class DQN(object):
         """Arguments for command line"""
         parser = argparse.ArgumentParser("DQN experiments for Atari games")
         parser.add_argument("--env", type=str, default="Pong", help="name of the game")
+        parser.add_argument("--env-type", type=str, default="paper",
+                            choices=["paper", "gym"], help="type of evaluation")
         parser.add_argument("--env-size", type=int, default=8, help="number of the environment")
 
         parser.add_argument("--replay-buffer-size", type=int, default=int(1e5), help="replay buffer size")
@@ -161,7 +163,7 @@ class DQN(object):
 
     def load_model(self):
         self.saver = tf.train.Saver(max_to_keep=50)
-        model_path = get_path('model/' + self.algorithm + '/' + self.args.env)
+        model_path = get_path('model/' + self.algorithm + '/' + self.args.env + '-' + self.args.env_type)
         subdir = next(os.walk(model_path))[1]
         if subdir:
             cmd = input("Found {} saved model(s), do you want to load? [y/N]".format(len(subdir)))
@@ -192,7 +194,7 @@ class DQN(object):
 
     def save_model(self):
         save_path = get_path('model/' + self.algorithm
-                             + '/' + self.args.env
+                             + '/' + self.args.env + '-' + self.args.env_type
                              + '/' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
         main_logger.info("Save model at {} with score {:.2f}".format(save_path, self.score))
         self.saver.save(self.sess, save_path + '/model.ckpt')

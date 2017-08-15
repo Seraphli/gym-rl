@@ -10,15 +10,17 @@ from gym import wrappers
 import datetime
 import numpy as np
 from util.util import get_path, boolean_flag, main_logger, Record
-from util.env_wrapper import wrap_gym
+from util.env_wrapper import wrap_gym, wrap_dqn
 
 cfg_fn = get_path('cfg') + '/OpenAI.json'
 
 
 def parse_args():
-    parser = argparse.ArgumentParser("OpenAI evaluation script")
+    parser = argparse.ArgumentParser("Evaluation script")
     parser.add_argument("--algo", type=str, default="DQN", choices=["DQN"], help="name of the algorithm")
-    parser.add_argument("--env", type=str, default="Pong-v0", help="name of the game")
+    parser.add_argument("--env", type=str, default="Pong", help="name of the game")
+    parser.add_argument("--env-type", type=str, default="paper",
+                        choices=["paper", "gym"], help="type of evaluation")
 
     if os.path.exists(cfg_fn):
         with open(cfg_fn, 'r') as f:
@@ -32,7 +34,7 @@ def parse_args():
 
 def load_model(args):
     sess = tf.Session()
-    model_path = get_path('model/' + args.algo + '/' + args.env)
+    model_path = get_path('model/' + args.algo + '/' + args.env + '-' + args.env_type)
     subdir = next(os.walk(model_path))[1]
     if subdir:
         cmd = input("Found {} saved model(s), do you want to load? [Y/n]".format(len(subdir)))
@@ -79,11 +81,16 @@ def main():
         main_logger.info("Evaluation exit")
         return
     model = build_graph()
-    env = gym.make(args.env)
-    save_path = get_path('tmp/openai_eval/' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
+    save_path = get_path('tmp/' + args.env_type + '_eval/' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
     main_logger.info("Evaluation will be stored in `{}`".format(save_path))
-    env = wrappers.Monitor(env, save_path)
-    env = wrap_gym(env)
+    if args.env_type == 'gym':
+        env = gym.make(args.env + '-v0')
+        env = wrappers.Monitor(env, save_path)
+        env = wrap_gym(env)  # applies a bunch of modification
+    else:
+        env = gym.make(args.env + 'NoFrameskip-v4')
+        env = wrappers.Monitor(env, save_path)
+        env = wrap_dqn(env)  # applies a bunch of modification
     rewards = []
     for i_episode in range(150):
         observation = env.reset()

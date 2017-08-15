@@ -7,19 +7,21 @@ gym.undo_logger_setup()
 
 
 class Env(object):
-    def __init__(self, game_name):
+    def __init__(self, game_name, game_type):
         """Build a gym environment.
          
         Args:
-            game_name (str): game_name (str): Name of the game        
+            game_name (str): game_name (str): Name of the game
+            game_type (str): Type of the environment
         """
         self._game_name = game_name
-        if '-v0' in game_name:
-            env = gym.make(game_name)
+        self._game_type = game_type
+        if game_type == 'gym':
+            env = gym.make(game_name + '-v0')
             self.monitored_env = SimpleMonitor(env)
             self.env = wrap_gym(self.monitored_env)  # applies a bunch of modification
         else:
-            env = gym.make(game_name + "NoFrameskip-v4")
+            env = gym.make(game_name + 'NoFrameskip-v4')
             self.monitored_env = SimpleMonitor(env)
             self.env = wrap_dqn(self.monitored_env)  # applies a bunch of modification
 
@@ -57,19 +59,21 @@ class Env(object):
 
 
 class EnvPool(object):
-    def __init__(self, game_name, size):
+    def __init__(self, game_name, game_type, size):
         """Environment pool
         
         Args:
             game_name (str): Name of the game
+            game_type (str): Type of the environment
             size (int): Size of environment pool 
         """
         self._game_name = game_name
+        self._game_type = game_type
         self._size = size
         self.setup()
 
     def setup(self):
-        self._envs = [Env(self._game_name) for _ in range(self._size)]
+        self._envs = [Env(self._game_name, self._game_type) for _ in range(self._size)]
         self._env_queue = [[mp.Queue(), mp.Queue()] for _ in range(self._size)]
         self._ps = [mp.Process(target=EnvPool._env_loop, args=(self._envs[_], self._env_queue[_]), daemon=True)
                     for _ in range(self._size)]

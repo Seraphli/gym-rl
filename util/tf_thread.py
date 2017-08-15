@@ -10,7 +10,7 @@ class EnqueueThread(threading.Thread):
         self.sample = sample
         self.inputs = inputs
 
-        self.op = self.queue.enqueue(inputs)
+        self.op = self.queue.enqueue(inputs, name='enqueue')
 
     def run(self):
         while True:

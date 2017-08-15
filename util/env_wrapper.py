@@ -123,6 +123,27 @@ class MaxAndSkipEnv(gym.Wrapper):
         return obs
 
 
+class MaxEnv(gym.Wrapper):
+    def __init__(self, env=None):
+        """Return only every `skip`-th frame"""
+        super(MaxEnv, self).__init__(env)
+        # most recent raw observations (for max pooling across time steps)
+        self._obs_buffer = deque(maxlen=2)
+
+    def _step(self, action):
+        obs, reward, done, info = self.env.step(action)
+        self._obs_buffer.append(obs)
+        max_frame = np.max(np.stack(self._obs_buffer), axis=0)
+        return max_frame, reward, done, info
+
+    def _reset(self):
+        """Clear past frame buffer and init. to first obs. from inner env."""
+        self._obs_buffer.clear()
+        obs = self.env.reset()
+        self._obs_buffer.append(obs)
+        return obs
+
+
 class ProcessFrame84(gym.ObservationWrapper):
     def __init__(self, env=None):
         super(ProcessFrame84, self).__init__(env)
@@ -223,6 +244,15 @@ def wrap_dqn(env):
     return env
 
 
+def wrap_gym(env):
+    assert '-v0' in env.spec.id
+    env = EpisodicLifeEnv(env)
+    env = MaxEnv(env)
+    env = ProcessFrame84(env)
+    env = FrameStack(env, 4)
+    return env
+
+
 class SimpleMonitor(gym.Wrapper):
     def __init__(self, env):
         """Adds two qunatities to info returned by every step:
@@ -294,15 +324,3 @@ class SimpleMonitor(gym.Wrapper):
         self._episode_rewards = ed['episode_rewards']
         self._episode_lengths = ed['episode_lengths']
         self._episode_end_times = ed['episode_end_times']
-
-
-if __name__ == '__main__':
-    env = gym.make("PongNoFrameskip-v4")
-    monitored_env = SimpleMonitor(env)
-    env = wrap_dqn(monitored_env)  # applies a bunch of modification
-
-    env.reset()
-    env.step(1)
-    monitored_env.reset_state()
-    env.reset()
-    env.step(1)

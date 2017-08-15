@@ -10,7 +10,7 @@ from tqdm import tqdm
 class Game(object):
     def __init__(self):
         self.args = args = agent.parse_args()
-        self.ep = EnvPool(args.env, self.args.env_size)
+        self.ep = EnvPool(args.env, args.env_type, args.env_size)
         self.eps = [MultiStageEpsilon([LinearAnnealEpsilon(1.0, 0.1, int(1e6)),
                                        LinearAnnealEpsilon(0.1, 0.05, int(1e7 - 1e6))]),
                     0]

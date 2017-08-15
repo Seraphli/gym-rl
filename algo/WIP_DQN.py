@@ -33,18 +33,22 @@ class DQN(object):
     def parse_args(self):
         """Arguments for command line"""
         parser = argparse.ArgumentParser("DQN experiments for Atari games")
-        parser.add_argument("--env", type=str, default="Pong", help="name of the game")
-        parser.add_argument("--env-size", type=int, default=8, help="number of the environment")
+        parser.add_argument("--env", type=str, metavar="Pong", default="Pong", help="name of the game")
+        parser.add_argument("--env-type", type=str, default="paper",
+                            choices=["paper", "gym"], help="type of evaluation")
+        parser.add_argument("--env-size", metavar="8", type=int, default=8, help="number of the environment")
 
-        parser.add_argument("--replay-buffer-size", type=int, default=int(1e5), help="replay buffer size")
-        parser.add_argument("--lr", type=float, default=1e-4, help="learning rate for Adam optimizer")
-        parser.add_argument("--num-iters", type=int, default=800,
+        parser.add_argument("--replay-buffer-size", metavar=str(int(1e5)),
+                            type=int, default=int(1e5), help="replay buffer size")
+        parser.add_argument("--lr", type=float, metavar=str(1e-4),
+                            default=1e-4, help="learning rate for Adam optimizer")
+        parser.add_argument("--num-iters", metavar=str(800), type=int, default=800,
                             help="total number of iterations to run the environment for")
-        parser.add_argument("--batch-size", type=int, default=32,
+        parser.add_argument("--batch-size", metavar=str(32), type=int, default=32,
                             help="number of transitions to optimize at the same time")
-        parser.add_argument("--learning-freq", type=int, default=4,
+        parser.add_argument("--learning-freq", metavar=str(4), type=int, default=4,
                             help="number of iterations between every optimization step")
-        parser.add_argument("--target-update-freq", type=int, default=40000,
+        parser.add_argument("--target-update-freq", metavar=str(40000), type=int, default=40000,
                             help="number of iterations between every target network update")
 
         self.args = parser.parse_args()
@@ -107,10 +111,10 @@ class DQN(object):
         t = tf.placeholder(tf.float32, [None, ], name='t')
         s_ = tf.placeholder(tf.uint8, [None, 84, 84, 4], name='s_')
         inputs = s, a, r, t, s_
-        self.queue = queue = tf.FIFOQueue(50, [i.dtype for i in inputs])
+        self.queue = queue = tf.FIFOQueue(50, [i.dtype for i in inputs], name='queue')
         replay_sample = partial(self.replay.sample, batch_size=self.args.batch_size)
         self.qt = EnqueueThread(self.sess, queue, replay_sample, inputs)
-        sample = queue.dequeue()
+        sample = queue.dequeue(name='dequeue')
         for s, i in zip(sample, inputs):
             s.set_shape(i.get_shape())
         return sample
@@ -124,25 +128,25 @@ class DQN(object):
         o_vars = [_w for w in ws if w for _w in w]
         t_vars = [_w for w in ws_ if w for _w in w]
         q_value = tf.reduce_sum(q * tf.one_hot(a, self.action_n), 1)
-        q_target = r + (1. - t) * self.gamma * tf.reduce_max(q_, axis=1, name='Qmax_s_')
+        q_target = r + (1. - t) * self.gamma * tf.reduce_max(q_, axis=1, name='q_max_s_')
         td_error = tf.stop_gradient(q_target) - q_value
         errors = huber_loss(td_error)
         optimizer = tf.train.AdamOptimizer(learning_rate=self.args.lr, epsilon=1e-4)
         optimize_expr = minimize_and_clip(optimizer, errors, var_list=o_vars)
         with tf.variable_scope('update_params'):
             update_expr = [tf.assign(t, o) for t, o in zip(t_vars, o_vars)]
-            update_params = tf.group(*update_expr)
-        eps = tf.placeholder(tf.float32, [], name='t')
+        update_params = tf.group(*update_expr, name='update')
+        eps = tf.placeholder(tf.float32, [], name='eps')
         with tf.variable_scope('action'):
             batch_size = tf.shape(s)[0]
             random_actions = tf.random_uniform(tf.stack([batch_size]), minval=0, maxval=self.action_n, dtype=tf.int64)
             deterministic_actions = tf.argmax(q, axis=1)
             chose_random = tf.random_uniform(tf.stack([batch_size]), minval=0, maxval=1, dtype=tf.float32) < eps
-            actions = tf.where(chose_random, random_actions, deterministic_actions)
+        actions = tf.where(chose_random, random_actions, deterministic_actions, name='act')
         return {'ph': [s, a, r, t, s_], 'eps': eps, 'act': actions, 'opt': optimize_expr, 'update': update_params}
 
     def take_action(self, observation, epsilon):
-        return tf.get_default_session().run(self.model['act'], feed_dict={
+        return self.sess.run(self.model['act'], feed_dict={
             self.model['ph'][0]: observation,
             self.model['eps']: epsilon
         })
@@ -161,7 +165,7 @@ class DQN(object):
 
     def load_model(self):
         self.saver = tf.train.Saver(max_to_keep=50)
-        model_path = get_path('tflog/' + self.algorithm + '/' + self.args.env)
+        model_path = get_path('model/' + self.algorithm + '/' + self.args.env + '-' + self.args.env_type)
         subdir = next(os.walk(model_path))[1]
         if subdir:
             cmd = input("Found {} saved model(s), do you want to load? [y/N]".format(len(subdir)))
@@ -173,7 +177,7 @@ class DQN(object):
                         with open(state_fn, 'r') as f:
                             state = json.load(f)
                         print("[{}]: Score: {}, Path: {}".format(i, state['score'], subdir[i]))
-                    load_path = model_path + '/' + subdir[int(input("Index:"))]
+                    load_path = model_path + '/' + subdir[int(input("Index: "))]
                 else:
                     load_path = model_path + '/' + subdir[0]
                 state_fn = load_path + '/state.json'
@@ -191,13 +195,13 @@ class DQN(object):
         return False
 
     def save_model(self):
-        save_path = get_path('tflog/' + self.algorithm
-                             + '/' + self.args.env
+        save_path = get_path('model/' + self.algorithm
+                             + '/' + self.args.env + '-' + self.args.env_type
                              + '/' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
         main_logger.info("Save model at {} with score {:.2f}".format(save_path, self.score))
         self.saver.save(self.sess, save_path + '/model.ckpt')
         with open(save_path + '/state.json', 'w') as f:
-            json.dump({'score': self.score, 'args': self.args}, f)
+            json.dump({'score': self.score, 'args': vars(self.args)}, f)
 
 
 agent = DQN()

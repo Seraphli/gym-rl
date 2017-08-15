@@ -33,20 +33,22 @@ class DQN(object):
     def parse_args(self):
         """Arguments for command line"""
         parser = argparse.ArgumentParser("DQN experiments for Atari games")
-        parser.add_argument("--env", type=str, default="Pong", help="name of the game")
+        parser.add_argument("--env", type=str, metavar="Pong", default="Pong", help="name of the game")
         parser.add_argument("--env-type", type=str, default="paper",
                             choices=["paper", "gym"], help="type of evaluation")
-        parser.add_argument("--env-size", type=int, default=8, help="number of the environment")
+        parser.add_argument("--env-size", metavar="8", type=int, default=8, help="number of the environment")
 
-        parser.add_argument("--replay-buffer-size", type=int, default=int(1e5), help="replay buffer size")
-        parser.add_argument("--lr", type=float, default=1e-4, help="learning rate for Adam optimizer")
-        parser.add_argument("--num-iters", type=int, default=800,
+        parser.add_argument("--replay-buffer-size", metavar=str(int(1e5)),
+                            type=int, default=int(1e5), help="replay buffer size")
+        parser.add_argument("--lr", type=float, metavar=str(1e-4),
+                            default=1e-4, help="learning rate for Adam optimizer")
+        parser.add_argument("--num-iters", metavar=str(800), type=int, default=800,
                             help="total number of iterations to run the environment for")
-        parser.add_argument("--batch-size", type=int, default=32,
+        parser.add_argument("--batch-size", metavar=str(32), type=int, default=32,
                             help="number of transitions to optimize at the same time")
-        parser.add_argument("--learning-freq", type=int, default=4,
+        parser.add_argument("--learning-freq", metavar=str(4), type=int, default=4,
                             help="number of iterations between every optimization step")
-        parser.add_argument("--target-update-freq", type=int, default=40000,
+        parser.add_argument("--target-update-freq", metavar=str(40000), type=int, default=40000,
                             help="number of iterations between every target network update")
 
         self.args = parser.parse_args()

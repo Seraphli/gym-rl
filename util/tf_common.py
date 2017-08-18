@@ -30,13 +30,14 @@ def vis_conv_layer(v, shape):
         v (Tensor): output of the layer,
             with shape (batch, height, width, channels)
         shape (tuple): a tuple of height, width,
-            channels, number of images in one line, number of lines
+            channels, number of images in one line
 
     Returns:
         Tensor: combined image of the output
 
     """
-    h, w, c, cy, cx = shape
+    h, w, c, cy = shape
+    cx = c // cy
     v = tf.slice(v, (0, 0, 0, 0), (1, -1, -1, -1))
     v = tf.reshape(v, (h, w, c))
     w += 4

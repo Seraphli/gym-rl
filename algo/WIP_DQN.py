@@ -5,7 +5,7 @@ import tensorflow as tf
 import argparse
 from util.tf_layer import tf_layer
 from util.util import main_logger, pretty_num, get_path
-from util.tf_common import huber_loss, minimize_and_clip
+from util.tf_common import huber_loss, minimize_and_clip, visualize, tensorboard
 from util.tf_thread import EnqueueThread, OptThread
 from functools import partial
 from queue import Queue
@@ -80,6 +80,11 @@ class DQN(object):
             {'layer': 'fc', 'size': self.action_n}
         ]
 
+    def _def_net_summary(self):
+        self.arch_sum = [
+            {'index': 1, 'vis_type': 'conv', 'tb_type': 'image'}
+        ]
+
     def _build_net(self, x, reuse=False, initializer=None, collections=None):
         if not initializer:
             initializer = [tf.contrib.layers.variance_scaling_initializer(), tf.constant_initializer()]
@@ -119,10 +124,28 @@ class DQN(object):
             s.set_shape(i.get_shape())
         return sample
 
+    def _def_tf_summary(self):
+        save_path = get_path('tf_log/' + self.algorithm
+                             + '/' + self.args.env + '-' + self.args.env_type
+                             + '/' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
+        self.summary_writer = tf.summary.FileWriter(save_path, self.sess.graph)
+        self.summary = []
+
+    def _add_summary(self, weights, layers):
+        for cfg in self.arch_sum:
+            self.summary.append(tensorboard[cfg['tb_type']](visualize[cfg['vis_type']](layers[cfg['index']])))
+
+        for i, w in enumerate(weights):
+            if w:
+                self.summary.append(tensorboard['histogram']('{}_i/w'.format(self.arch[i]['layer'], i), w[0]))
+                self.summary.append(tensorboard['histogram']('{}_i/b'.format(self.arch[i]['layer'], i), w[1]))
+                self.summary.append(tensorboard['histogram']('{}_i'.format(self.arch[i]['layer'], i), layers[i]))
+
     def _def_model(self):
         s, a, r, t, s_ = self._def_input()
         with tf.variable_scope('online'):
             q, ws, ys = self._build_net(s, collections='online')
+        self._add_summary(ws, ys)
         with tf.variable_scope('target'):
             q_, ws_, ys_ = self._build_net(s_, collections='target')
         o_vars = [_w for w in ws if w for _w in w]

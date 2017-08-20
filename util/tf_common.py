@@ -23,21 +23,34 @@ def minimize_and_clip(optimizer, objective, var_list, clip_val=10):
     return optimizer.apply_gradients(gradients)
 
 
-def vis_conv_layer(v, shape):
+def find_factor(n):
+    """Find the largest factor
+    
+    Args:
+        n (int): number 
+
+    Returns:
+        int: largest factor
+        int: another factor that equals n divided by largest factor
+    """
+    for i in range(int(n ** 0.5) + 1, 1, -1):
+        if n % i == 0:
+            return n // i, i
+
+
+def vis_conv_layer(v):
     """Visualize convolution layer
     
     Args:
         v (Tensor): output of the layer,
             with shape (batch, height, width, channels)
-        shape (tuple): a tuple of height, width,
-            channels, number of images in one line
 
     Returns:
         Tensor: combined image of the output
 
     """
-    h, w, c, cy = shape
-    cx = c // cy
+    _, h, w, c = v.get_shape().as_list()
+    cy, cx = find_factor(c)
     v = tf.slice(v, (0, 0, 0, 0), (1, -1, -1, -1))
     v = tf.reshape(v, (h, w, c))
     w += 4
@@ -49,19 +62,23 @@ def vis_conv_layer(v, shape):
     return v
 
 
-def vis_fc_layer(v, shape):
+def vis_fc_layer(v):
     """Visualize full-connected layer
     
     Args:
         v (Tensor): output of the layer,
             with shape (batch, depth)
-        shape (tuple): a tuple of height, width
 
     Returns:
         Tensor: one image of the output
 
     """
-    h, w = shape
+    _, depth = v.get_shape().as_list()
+    h, w = find_factor(depth)
     v = tf.slice(v, (0, 0), (1, -1))
     v = tf.reshape(v, (1, h, w, 1))
     return v
+
+
+visualize = {'conv': vis_conv_layer, 'fc': vis_fc_layer}
+tensorboard = {'image': tf.summary.image, 'histogram': tf.summary.histogram}

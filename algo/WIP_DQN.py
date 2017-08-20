@@ -5,8 +5,8 @@ import tensorflow as tf
 import argparse
 from util.tf_layer import tf_layer
 from util.util import main_logger, pretty_num, get_path
-from util.tf_common import huber_loss, minimize_and_clip
-from util.tf_thread import EnqueueThread, OptThread
+from util.tf_common import huber_loss, minimize_and_clip, visualize, tensorboard
+from util.tf_thread import EnqueueThread, OpThread, SummaryThread
 from functools import partial
 from queue import Queue
 import json
@@ -22,12 +22,15 @@ class DQN(object):
         self.replay = replay
         self._train = False
         self.gamma = 0.99
+        self.summary = []
         self._def_net()
+        self._def_net_summary()
         self.model = self._def_model()
         if not self.load_model():
             init = tf.global_variables_initializer()
             self.sess.run(init)
         self.sess.graph.finalize()
+        self._def_tf_summary()
         self.sess.run(self.model['update'])
 
     def parse_args(self):
@@ -80,6 +83,15 @@ class DQN(object):
             {'layer': 'fc', 'size': self.action_n}
         ]
 
+    def _def_net_summary(self):
+        self.arch_sum = [
+            {'index': 1, 'vis_type': 'conv', 'tb_type': 'image'},
+            {'index': 3, 'vis_type': 'conv', 'tb_type': 'image'},
+            {'index': 5, 'vis_type': 'conv', 'tb_type': 'image'},
+            {'index': 8, 'vis_type': 'fc', 'tb_type': 'image'},
+            {'index': 9, 'vis_type': 'fc', 'tb_type': 'image'}
+        ]
+
     def _build_net(self, x, reuse=False, initializer=None, collections=None):
         if not initializer:
             initializer = [tf.contrib.layers.variance_scaling_initializer(), tf.constant_initializer()]
@@ -119,25 +131,48 @@ class DQN(object):
             s.set_shape(i.get_shape())
         return sample
 
+    def _def_tf_summary(self):
+        save_path = get_path('tf_log/' + self.algorithm
+                             + '/' + self.args.env + '-' + self.args.env_type
+                             + '/' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
+        self.summary_writer = tf.summary.FileWriter(save_path, self.sess.graph)
+
+    def _add_summary(self, weights, layers):
+        for cfg in self.arch_sum:
+            self.summary.append(tensorboard[cfg['tb_type']]('layer_{}'.format(cfg['index']),
+                                                            visualize[cfg['vis_type']](layers[cfg['index']])))
+
+        for i, w in enumerate(weights):
+            if w:
+                self.summary.append(tensorboard['histogram']('{}_{}/w'.format(self.arch[i]['layer'], i), w[0]))
+                self.summary.append(tensorboard['histogram']('{}_{}/b'.format(self.arch[i]['layer'], i), w[1]))
+                self.summary.append(tensorboard['histogram']('{}_{}'.format(self.arch[i]['layer'], i), layers[i]))
+
     def _def_model(self):
         s, a, r, t, s_ = self._def_input()
         with tf.variable_scope('online'):
             q, ws, ys = self._build_net(s, collections='online')
+        self._add_summary(ws, ys)
         with tf.variable_scope('target'):
             q_, ws_, ys_ = self._build_net(s_, collections='target')
         o_vars = [_w for w in ws if w for _w in w]
         t_vars = [_w for w in ws_ if w for _w in w]
-        q_value = tf.reduce_sum(q * tf.one_hot(a, self.action_n), 1)
-        q_target = r + (1. - t) * self.gamma * tf.reduce_max(q_, axis=1, name='q_max_s_')
-        td_error = tf.stop_gradient(q_target) - q_value
-        errors = huber_loss(td_error)
-        optimizer = tf.train.AdamOptimizer(learning_rate=self.args.lr, epsilon=1e-4)
-        optimize_expr = minimize_and_clip(optimizer, errors, var_list=o_vars)
+        with tf.name_scope('q'):
+            q_value = tf.reduce_sum(q * tf.one_hot(a, self.action_n), 1)
+            q_max = tf.reduce_max(q_, axis=1, name='q_max_s_')
+            q_target = r + (1. - t) * self.gamma * q_max
+        self.summary.append(tensorboard['scalar']('q_max', q_max[0]))
+        with tf.name_scope('grad'):
+            td_error = tf.stop_gradient(q_target) - q_value
+            errors = huber_loss(td_error)
+            optimizer = tf.train.AdamOptimizer(learning_rate=self.args.lr, epsilon=1e-4)
+            optimize_expr = minimize_and_clip(optimizer, errors, var_list=o_vars)
+        self.summary.append(tensorboard['scalar']('loss', tf.reduce_mean(errors)))
         with tf.variable_scope('update_params'):
             update_expr = [tf.assign(t, o) for t, o in zip(t_vars, o_vars)]
         update_params = tf.group(*update_expr, name='update')
         eps = tf.placeholder(tf.float32, [], name='eps')
-        with tf.variable_scope('action'):
+        with tf.name_scope('action'):
             batch_size = tf.shape(s)[0]
             random_actions = tf.random_uniform(tf.stack([batch_size]), minval=0, maxval=self.action_n, dtype=tf.int64)
             deterministic_actions = tf.argmax(q, axis=1)
@@ -157,11 +192,14 @@ class DQN(object):
     def train(self, times=1):
         if not self._train:
             self.qt.start()
-            self.opt_queue = Queue()
-            OptThread(self.sess, self.opt_queue, self.model['opt']).start()
+            self.op_queue = Queue()
+            OpThread(self.sess, self.op_queue, self.model['opt']).start()
+            self.summary_queue = Queue()
+            SummaryThread(self.sess, self.summary_queue, self.summary, self.summary_writer).start()
             self._train = True
         for _ in range(times):
-            self.opt_queue.put('opt')
+            self.op_queue.put('run')
+        self.summary_queue.put('run')
 
     def load_model(self):
         self.saver = tf.train.Saver(max_to_keep=50)

@@ -1,5 +1,6 @@
 import gym
 from util.env_wrapper import wrap_dqn, wrap_gym, SimpleMonitor
+import util.util as U
 import multiprocessing as mp
 import numpy as np
 
@@ -7,7 +8,7 @@ gym.undo_logger_setup()
 
 
 class Env(object):
-    def __init__(self, game_name, game_type):
+    def __init__(self, game_name, game_type, index=-1):
         """Build a gym environment.
          
         Args:
@@ -16,6 +17,7 @@ class Env(object):
         """
         self._game_name = game_name
         self._game_type = game_type
+        self._index = index
         if game_type == 'gym':
             env = gym.make(game_name + '-v0')
             self.monitored_env = SimpleMonitor(env)
@@ -46,6 +48,7 @@ class Env(object):
 
     def auto_reset(self):
         if self.done:
+            U.env_logger.debug('Environment {} finished with reward {}'.format(self._index, self.reward))
             self.obs = np.array(self.env.reset())
         else:
             self.obs = np.array(self.obs_)
@@ -73,7 +76,7 @@ class EnvPool(object):
         self.setup()
 
     def setup(self):
-        self._envs = [Env(self._game_name, self._game_type) for _ in range(self._size)]
+        self._envs = [Env(self._game_name, self._game_type, i) for i in range(self._size)]
         self._env_queue = [[mp.Queue(), mp.Queue()] for _ in range(self._size)]
         self._ps = [mp.Process(target=EnvPool._env_loop, args=(self._envs[_], self._env_queue[_]), daemon=True)
                     for _ in range(self._size)]

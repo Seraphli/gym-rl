@@ -1,8 +1,9 @@
 from algo.WIP_DQN import agent as agent
-import numpy as np, time
+import numpy as np
 from util.replay_buffer import ReplayBuffer
 from util.epsilon import LinearAnnealEpsilon, MultiStageEpsilon
 from util.util import *
+import util.util as U
 from util.env_pool import EnvPool
 from tqdm import tqdm
 
@@ -10,13 +11,14 @@ from tqdm import tqdm
 class Game(object):
     def __init__(self):
         self.args = args = agent.parse_args()
+        get_logger(agent.algorithm, args.env, args.env_type)
         self.ep = EnvPool(args.env, args.env_type, args.env_size)
         self.eps = [MultiStageEpsilon([LinearAnnealEpsilon(1.0, 0.1, int(1e6)),
                                        LinearAnnealEpsilon(0.1, 0.05, int(1e7 - 1e6))]),
                     0]
         self.replay = ReplayBuffer(args.replay_buffer_size)
-        main_logger.info("Replay Buffer Max Size: {}B".format(pretty_num(args.replay_buffer_size *
-                                                                         (84 * 84 * 4 * 2 + 8), True)))
+        U.main_logger.info("Replay Buffer Max Size: {}B".format(pretty_num(args.replay_buffer_size *
+                                                                           (84 * 84 * 4 * 2 + 8), True)))
         self.sess = agent.make_session()
         self.sess.__enter__()
         agent.setup(self.ep.action_num, self.replay)
@@ -39,7 +41,7 @@ class Game(object):
         record.add_key_value('Phase', 'Random')
         record.add_key_value('Episodes', pretty_num(total_epi))
         record.add_key_value('Mean Reward', np.round(mean_reward, 2))
-        main_logger.info("\n" + record.dumps())
+        U.main_logger.info("\n" + record.dumps())
         if not self.max_reward:
             self.max_reward = mean_reward
 
@@ -69,7 +71,7 @@ class Game(object):
         record.add_key_value('Episodes', pretty_num(total_epi))
         record.add_key_value('% Exploration', np.round(self.eps[0].get(self.train_epi * train_step) * 100, 2))
         record.add_key_value('Reward (100 epi mean)', np.round(mean_reward, 2))
-        main_logger.info("\n" + record.dumps())
+        U.main_logger.info("\n" + record.dumps())
 
     def test(self):
         test_step = 200000
@@ -88,7 +90,7 @@ class Game(object):
         record.add_key_value('Phase', 'Evaluation')
         record.add_key_value('Episodes', pretty_num(total_epi))
         record.add_key_value('Mean Reward', np.round(mean_reward, 2))
-        main_logger.info("\n" + record.dumps())
+        U.main_logger.info("\n" + record.dumps())
         if self.max_reward < mean_reward:
             self.max_reward = mean_reward
             agent.score = mean_reward

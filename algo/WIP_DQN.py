@@ -4,7 +4,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 import argparse
 from util.tf_layer import tf_layer
-from util.util import main_logger, pretty_num, get_path
+from util.util import pretty_num, get_path
+import util.util as U
 from util.tf_common import huber_loss, minimize_and_clip, visualize, tensorboard
 from util.tf_thread import EnqueueThread, OpThread, SummaryThread
 from functools import partial
@@ -113,7 +114,7 @@ class DQN(object):
             ws.append(w)
             ys.append(y)
             ms_size += m_size
-        main_logger.info("param: {}, memory size: {}B".format(ms_size, pretty_num(ms_size * 4, True)))
+        U.main_logger.info("param: {}, memory size: {}B".format(ms_size, pretty_num(ms_size * 4, True)))
         return y, ws, ys
 
     def _def_input(self):
@@ -224,19 +225,19 @@ class DQN(object):
                 checkpoint = tf.train.get_checkpoint_state(load_path)
                 if checkpoint and checkpoint.model_checkpoint_path:
                     self.saver.restore(self.sess, checkpoint.model_checkpoint_path)
-                    main_logger.info("Successfully loaded model: Score: {}, Path: {}".
-                                     format(state['score'], checkpoint.model_checkpoint_path))
+                    U.main_logger.info("Successfully loaded model: Score: {}, Path: {}".
+                                       format(state['score'], checkpoint.model_checkpoint_path))
                     self.score = state['score']
                     return True
         self.score = None
-        main_logger.info("No model loaded")
+        U.main_logger.info("No model loaded")
         return False
 
     def save_model(self):
         save_path = get_path('model/' + self.algorithm
                              + '/' + self.args.env + '-' + self.args.env_type
                              + '/' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
-        main_logger.info("Save model at {} with score {:.2f}".format(save_path, self.score))
+        U.main_logger.info("Save model at {} with score {:.2f}".format(save_path, self.score))
         self.saver.save(self.sess, save_path + '/model.ckpt')
         with open(save_path + '/state.json', 'w') as f:
             json.dump({'score': self.score, 'args': vars(self.args)}, f)

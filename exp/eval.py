@@ -9,7 +9,8 @@ import gym
 from gym import wrappers
 import datetime
 import numpy as np
-from util.util import get_path, boolean_flag, main_logger, Record
+from util.util import get_path, boolean_flag, Record
+import util.util as U
 from util.env_wrapper import wrap_gym, wrap_dqn
 
 cfg_fn = get_path('cfg') + '/OpenAI.json'
@@ -56,10 +57,10 @@ def load_model(args):
             checkpoint = tf.train.get_checkpoint_state(load_path)
             if checkpoint and checkpoint.model_checkpoint_path:
                 saver.restore(sess, checkpoint.model_checkpoint_path)
-                main_logger.info("Successfully loaded model: Score: {}, Path: {}".
-                                 format(state['score'], checkpoint.model_checkpoint_path))
+                U.main_logger.info("Successfully loaded model: Score: {}, Path: {}".
+                                   format(state['score'], checkpoint.model_checkpoint_path))
                 return True, sess
-    main_logger.info("No model loaded")
+    U.main_logger.info("No model loaded")
     return False, None
 
 
@@ -78,11 +79,11 @@ def main():
         json.dump({'APIKey': args.api_key}, f)
     result, sess = load_model(args)
     if not result:
-        main_logger.info("Evaluation exit")
+        U.main_logger.info("Evaluation exit")
         return
     model = build_graph()
     save_path = get_path('tmp/' + args.env_type + '_eval/' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
-    main_logger.info("Evaluation will be stored in `{}`".format(save_path))
+    U.main_logger.info("Evaluation will be stored in `{}`".format(save_path))
     if args.env_type == 'gym':
         env = gym.make(args.env + '-v0')
         env = wrappers.Monitor(env, save_path)
@@ -110,11 +111,11 @@ def main():
                 record.add_key_value('Total step', step)
                 record.add_key_value('Episode reward', epi_reward)
                 record.add_key_value('Reward (100 epi mean)', np.round(np.mean(rewards[-100:]), 2))
-                main_logger.info("\n" + record.dumps())
+                U.main_logger.info("\n" + record.dumps())
                 break
     env.close()
     gym.upload(save_path, api_key=args.api_key)
-    main_logger.info("Evaluation complete")
+    U.main_logger.info("Evaluation complete")
 
 
 if __name__ == '__main__':

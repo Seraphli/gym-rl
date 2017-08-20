@@ -48,14 +48,18 @@ class ColoredFormatter(logging.Formatter):
         return message + RESET_SEQ
 
 
-def init_logger(name):
+def init_logger(name, path=None):
+    """Initialize a logger with certain name
+    
+    Args:
+        name (str): logger name 
+        path (str): optional, specify which folder path 
+            the log file will be stored, for example
+            '/tmp/log/DQN/Pong'
+
+    Returns:
+        logging.Logger: logger instance
     """
-    Initialize a logger with certain name
-    :param name: logger name
-    :return: logger
-    :rtype: logging.Logger
-    """
-    import logging
     import logging.handlers
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
@@ -77,9 +81,11 @@ def init_logger(name):
     ch.setLevel(logging.INFO)
     ch.setFormatter(cformatter)
 
-    rf = logging.handlers.RotatingFileHandler(get_path('log') + '/' + name + '.log',
-                                              maxBytes=5 * 1024 * 1024,
-                                              backupCount=5)
+    if path:
+        path += '/' + name + '.log'
+    else:
+        path = get_path('log') + '/' + name + '.log'
+    rf = logging.handlers.RotatingFileHandler(path, maxBytes=5 * 1024 * 1024, backupCount=5)
     rf.setLevel(logging.DEBUG)
     rf.setFormatter(nformatter)
 
@@ -88,7 +94,14 @@ def init_logger(name):
     return logger
 
 
-main_logger = init_logger('main')
+def get_logger(algorithm, env, env_type):
+    import datetime
+    path = get_path('log/' + algorithm
+                    + '/' + env + '-' + env_type
+                    + '/' + datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
+    global main_logger, env_logger
+    main_logger = init_logger('main', path)
+    env_logger = init_logger('env', path)
 
 
 def load_config(name):

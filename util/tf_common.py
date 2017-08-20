@@ -81,4 +81,4 @@ def vis_fc_layer(v):
 
 
 visualize = {'conv': vis_conv_layer, 'fc': vis_fc_layer}
-tensorboard = {'image': tf.summary.image, 'histogram': tf.summary.histogram}
+tensorboard = {'image': tf.summary.image, 'histogram': tf.summary.histogram, 'scalar': tf.summary.scalar}

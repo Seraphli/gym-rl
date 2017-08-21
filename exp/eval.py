@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import os
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -17,7 +18,7 @@ cfg_fn = get_path('cfg') + '/OpenAI.json'
 
 
 def parse_args():
-    parser = argparse.ArgumentParser("Evaluation script")
+    parser = argparse.ArgumentParser(description="Evaluation script")
     parser.add_argument("--algo", type=str, default="DQN", choices=["DQN"], help="name of the algorithm")
     parser.add_argument("--env", type=str, metavar="Pong", default="Pong", help="name of the game")
     parser.add_argument("--env-type", type=str, default="paper",

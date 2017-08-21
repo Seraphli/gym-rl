@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from algo.DQN import agent as agent
 import numpy as np
 from util.replay_buffer import ReplayBuffer

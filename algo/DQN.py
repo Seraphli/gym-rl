@@ -36,7 +36,7 @@ class DQN(object):
 
     def parse_args(self):
         """Arguments for command line"""
-        parser = argparse.ArgumentParser("DQN experiments for Atari games")
+        parser = argparse.ArgumentParser(description="DQN experiments for Atari games")
         parser.add_argument("--env", type=str, metavar="Pong", default="Pong", help="name of the game")
         parser.add_argument("--env-type", type=str, default="paper",
                             choices=["paper", "gym"], help="type of evaluation")

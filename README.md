@@ -19,12 +19,12 @@ Recommend **Virtualenv**
 git clone https://github.com/Seraphli/gym-rl.git
 cd gym-rl
 pip install -r requirement.txt
-PYTHONPATH=. python exp/WIP_DQN_train.py
+PYTHONPATH=. python exp/DQN_train.py
 ```
 
 See help for more information and configuration
 ```
-PYTHONPATH=. python exp/WIP_DQN_train.py --help
+PYTHONPATH=. python exp/DQN_train.py --help
 ```
 
 ## Thanks

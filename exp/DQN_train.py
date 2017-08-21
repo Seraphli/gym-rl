@@ -1,124 +1,111 @@
+from algo.DQN import agent as agent
+import numpy as np
+from util.replay_buffer import ReplayBuffer
+from util.epsilon import LinearAnnealEpsilon, MultiStageEpsilon
+from util.util import *
+import util.util as U
+from util.env_pool import EnvPool
 from tqdm import tqdm
-from agent.DQN import DQN
-from utility.utility import init_logger, load_config
-from utility.env_pool import *
-import os
-
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-import tensorflow as tf
 
 
 class Game(object):
     def __init__(self):
-        self.name = 'DQN'
-        self.usage = """
-        Usage: DQN_train.py [DQN.yml]
-        """
-        self._agent_algo = DQN
+        self.args = args = agent.parse_args()
+        get_logger(agent.algorithm, args.env, args.env_type)
+        self.ep = EnvPool(args.env, args.env_type, args.env_size)
+        self.eps = [MultiStageEpsilon([LinearAnnealEpsilon(1.0, 0.1, int(1e6)),
+                                       LinearAnnealEpsilon(0.1, 0.05, int(1e7 - 1e6))]),
+                    0]
+        self.replay = ReplayBuffer(args.replay_buffer_size)
+        U.main_logger.info("Replay Buffer Max Size: {}B".format(pretty_num(args.replay_buffer_size *
+                                                                           (84 * 84 * 4 * 2 + 8), True)))
+        self.sess = agent.make_session()
+        self.sess.__enter__()
+        agent.setup(self.ep.action_num, self.replay)
+        self.train_epi = 0
+        self.max_reward = agent.score
 
-    def setup(self, cfg='DQN.yml'):
-        self._cfg = cfg
-        self._config = load_config(self._cfg)
-        self.logger = init_logger(self._config["Train"]["LoggerName"])
-        self._env_name = self._config["Train"]["Game"]
-        self.sess = tf.Session()
-        env = Env(self._env_name)
-        self._agent = self._agent_algo(self.sess, {"action_n": env.action_num, "name": env.name},
-                                       self._config["Agent"], self.logger)
-        del env
-        init = tf.global_variables_initializer()
-        self.sess.graph.finalize()
+    def random(self):
+        random_step = self.args.replay_buffer_size // 2
+        obs = self.ep.reset()
+        with tqdm(total=random_step, desc="random", ascii=True) as t:
+            while t.n < random_step:
+                action, (obs_, reward, done, info) = self.ep.random()
+                [self.replay.add(obs[i], action[i], reward[i], float(done[i]), obs_[i]) for i in range(self.ep.size)]
+                obs, info = self.ep.auto_reset()
+                t.update(self.ep.size)
+        total_epi = sum(len(info[i]['rewards']) for i in range(self.ep.size))
+        mean_reward = np.mean(
+            [np.mean(info[i]['rewards']) for i in range(self.ep.size) if info[i]['rewards']])
+        record = Record()
+        record.add_key_value('Phase', 'Random')
+        record.add_key_value('Episodes', pretty_num(total_epi))
+        record.add_key_value('Mean Reward', np.round(mean_reward, 2))
+        U.main_logger.info("\n" + record.dumps())
+        if not self.max_reward:
+            self.max_reward = mean_reward
 
-        if not self._agent.load_session():
-            self.sess.run(init)
-        self._use_lives = True
-        self._env_size = 16
-        self._ep = EnvPool(self._env_name, self._env_size, self._agent.preprocessor)
+    def train(self):
+        train_step = 250000
+        self.ep.reset_state()
+        obs = self.ep.reset()
+        with tqdm(total=train_step, desc="Train", ascii=True) as t:
+            while t.n < train_step:
+                action = agent.take_action(obs, self.eps[0].get(self.train_epi * train_step + t.n))
+                obs_, reward, done, info = self.ep.step(action)
+                [self.replay.add(obs[i], action[i], reward[i], float(done[i]), obs_[i]) for i in range(self.ep.size)]
+                obs, info = self.ep.auto_reset()
+                if t.n % self.args.target_update_freq == 0:
+                    agent.update_target()
+                if t.n % self.args.learning_freq == 0:
+                    agent.train(self.ep.size)
+                t.update(self.ep.size)
+        self.train_epi += 1
+        completion = np.round(self.train_epi / self.args.num_iters, 2)
+        total_epi = sum(len(info[i]['rewards']) for i in range(self.ep.size))
+        mean_reward = np.mean(
+            [np.mean(info[i]['rewards'][-100:]) for i in range(self.ep.size) if info[i]['rewards']])
+        record = Record()
+        record.add_key_value('Phase', 'Train')
+        record.add_key_value('% Completion', completion)
+        record.add_key_value('Episodes', pretty_num(total_epi))
+        record.add_key_value('% Exploration', np.round(self.eps[0].get(self.train_epi * train_step) * 100, 2))
+        record.add_key_value('Reward (100 epi mean)', np.round(mean_reward, 2))
+        U.main_logger.info("\n" + record.dumps())
 
-    def clear_stat(self):
-        self.n_games = 0
-        self.min_score = .0
-        self.max_score = .0
-        self.total_score = .0
-        self.total_step = 0
-        self.complete = False
-
-    def update(self):
-        for r in self._result:
-            done, transition, frame, score = r
-            self._agent.store_transition(transition)
-            self.total_step += 1
-            self._tqdm.update()
-            if self.total_step == self._step:
-                break
-            if done:
-                self.min_score = min(self.min_score, score)
-                self.max_score = max(self.max_score, score)
-                self.total_score += score
-                self.n_games += 1
-
-    def game(self, phase, step):
-        self.clear_stat()
-        self._step = step
-        with tqdm(total=step, desc=phase) as self._tqdm:
-            if phase == "Random":
-                self._ep.reset()
-                while self.total_step < step:
-                    self._result = self._ep.random()
-                    self.update()
-            if phase == "Train":
-                self._ep.reset()
-                while self.total_step < step:
-                    result = self._ep.before_step()
-                    actions = [self._agent.train(r) for r in result]
-                    self._result = self._ep.step(actions)
-                    self.update()
-            if phase == "Test":
-                self._ep.reset()
-                while self.total_step < step:
-                    result = self._ep.before_step()
-                    actions = [self._agent.eval(r) for r in result]
-                    self._result = self._ep.step(actions)
-                    self.update()
-        self.average_score = self.total_score / self.n_games
-
-        return self.n_games, self.total_step, self.average_score, self.min_score, self.max_score
+    def test(self):
+        test_step = 200000
+        self.ep.reset_state()
+        obs = self.ep.reset()
+        with tqdm(total=test_step, desc="Evaluation", ascii=True) as t:
+            while t.n < test_step:
+                action = agent.take_action(obs, self.eps[1])
+                self.ep.step(action)
+                obs, info = self.ep.auto_reset()
+                t.update(self.ep.size)
+        total_epi = sum(len(info[i]['rewards']) for i in range(self.ep.size))
+        mean_reward = np.mean(
+            [np.mean(info[i]['rewards']) for i in range(self.ep.size) if info[i]['rewards']])
+        record = Record()
+        record.add_key_value('Phase', 'Evaluation')
+        record.add_key_value('Episodes', pretty_num(total_epi))
+        record.add_key_value('Mean Reward', np.round(mean_reward, 2))
+        U.main_logger.info("\n" + record.dumps())
+        if self.max_reward < mean_reward:
+            self.max_reward = mean_reward
+            agent.score = mean_reward
+            agent.save_model()
 
     def run(self):
-        self.logger.info('Session start')
-        n_games, total_step, average_score, min_score, max_score \
-            = self.game("Random", self._config["Agent"]["Algorithm"]["ReplayStartSize"])
-        self.logger.info('PHASE: %s, N: %d, STEP: %d, AVG: %f, MIN: %d, MAX: %d' %
-                         ("Random", n_games, total_step, average_score, min_score, max_score))
-        self._agent.prepare_train()
-        for _ in range(self._config["Train"]["Episode"]):
-            n_games, total_step, average_score, min_score, max_score \
-                = self.game("Train", self._config["Train"]["TrainStep"])
-            self.logger.info('PHASE: %s, N: %d, STEP: %d, AVG: %f, MIN: %d, MAX: %d' %
-                             ("Train", n_games, total_step, average_score, min_score, max_score))
-            self._agent.add_summary("Train", (_, average_score, min_score, max_score))
-            n_games, total_step, average_score, min_score, max_score \
-                = self.game("Test", self._config["Train"]["TestStep"])
-            self.logger.info('PHASE: %s, N: %d, STEP: %d, AVG: %f, MIN: %d, MAX: %d' %
-                             ("Test", n_games, total_step, average_score, min_score, max_score))
-            self._agent.add_summary("Test", (_, average_score, min_score, max_score))
+        self.random()
+        for i in range(self.args.num_iters):
+            self.train()
+            self.test()
+        self.exit()
 
-    def run_safe(self):
-        try:
-            self.run()
-        except KeyboardInterrupt:
-            self.logger.info('Session stop')
+    def exit(self):
+        self.ep.close()
 
 
 if __name__ == '__main__':
-    import sys
-
-    g = Game()
-    if len(sys.argv) > 2:
-        print(g.usage)
-    elif len(sys.argv) == 2:
-        g.setup(sys.argv[1])
-        g.run_safe()
-    else:
-        g.setup()
-        g.run_safe()
+    Game().run()

@@ -16,6 +16,9 @@ import datetime
 
 class DQN(object):
     def __init__(self):
+        self._def_algorithm()
+
+    def _def_algorithm(self):
         self.algorithm = 'DQN'
 
     def setup(self, action_n, replay):

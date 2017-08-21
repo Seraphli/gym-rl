@@ -4,8 +4,7 @@ from util.tf_common import huber_loss, minimize_and_clip, tensorboard
 
 
 class DoubleDQN(DQN):
-    def __init__(self):
-        super(DoubleDQN, self).__init__()
+    def _def_algorithm(self):
         self.algorithm = 'DoubleDQN'
 
     def _def_model(self):

@@ -48,7 +48,7 @@ class Env(object):
 
     def auto_reset(self):
         if self.done:
-            U.env_logger.debug('Environment {} finished with reward {}'.format(self._index, self.reward))
+            U.env_logger.debug('Environment {} finished with reward {}'.format(self._index, self.info['rewards'][-1]))
             self.obs = np.array(self.env.reset())
         else:
             self.obs = np.array(self.obs_)

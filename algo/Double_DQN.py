@@ -12,6 +12,8 @@ class DoubleDQN(DQN):
         s, a, r, t, s_ = self._def_input()
         with tf.variable_scope('online'):
             q, ws, ys = self._build_net(s, collections='online')
+        with tf.variable_scope('online', reuse=True):
+            qs_, _, _ = self._build_net(s_, collections='online')
         self._add_summary(ws, ys)
         with tf.variable_scope('target'):
             q_, ws_, ys_ = self._build_net(s_, collections='target')
@@ -19,7 +21,9 @@ class DoubleDQN(DQN):
         t_vars = [_w for w in ws_ if w for _w in w]
         with tf.name_scope('q'):
             q_value = tf.reduce_sum(q * tf.one_hot(a, self.action_n), 1)
-            q_max = tf.reduce_max(q_, axis=1, name='q_max_s_')
+            q_max = tf.reduce_max(tf.multiply(
+                tf.one_hot(tf.argmax(qs_, axis=1), self.action_n),
+                q_), axis=1, name='q_max_s_')
             q_target = r + (1. - t) * self.gamma * q_max
         self.summary.append(tensorboard['scalar']('q_max', q_max[0]))
         with tf.name_scope('grad'):
@@ -39,3 +43,6 @@ class DoubleDQN(DQN):
             chose_random = tf.random_uniform(tf.stack([batch_size]), minval=0, maxval=1, dtype=tf.float32) < eps
         actions = tf.where(chose_random, random_actions, deterministic_actions, name='act')
         return {'ph': [s, a, r, t, s_], 'eps': eps, 'act': actions, 'opt': optimize_expr, 'update': update_params}
+
+
+agent = DoubleDQN()
